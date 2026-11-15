@@ -1,0 +1,2385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paper Plane — write someone a card</title>
+<meta name="description" content="Write a letter, pick the envelope and the paper, add a song, and send one link.">
+<meta property="og:title" content="You have a letter">
+<meta property="og:description" content="Tap to open it.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#FBF3E4">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Only the interface fonts and the default pen load up front. Every other
+     handwriting is fetched the moment it is actually needed, so someone
+     opening a card downloads one pen, not ten. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=Caveat:wght@500;600;700&display=swap">
+<style>
+  /* Cream grid-paper workbench: edit on the left, live envelope on the right,
+     a full-screen preview before sending. With ?c= in the address the page
+     becomes the card itself. */
+  :root {
+    --paper: #FBF3E4;
+    --paper-2: #FFFBF2;
+    --grid: rgba(26,22,20,.055);
+    --ink: #17120F;
+    --ink-soft: #6B5F55;
+    --line: rgba(23,18,15,.14);
+    --sun: #F5B931;
+    --candy: #FF5FA2;
+    --sky: #35B6F2;
+    --grass: #2FCF9E;
+    --coral: #FF6B4A;
+    --grape: #9B7BFF;
+    --accent: var(--sun);
+    --display: 'Fredoka', 'Trebuchet MS', sans-serif;
+    --body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+    --hand: 'Caveat', 'Bradley Hand', cursive;
+    --hand-scale: 1;
+    color-scheme: light;
+  }
+  /* The workbench only. A card always keeps the colours its sender chose. */
+  :root[data-theme="night"] {
+    --paper: #14121A;
+    --paper-2: #1D1A25;
+    --grid: rgba(255,255,255,.05);
+    --ink: #F4EFE5;
+    --ink-soft: #A79FB4;
+    --line: rgba(255,255,255,.15);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink); font-family: var(--body); font-size: 15px;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 26px 26px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 26px 26px,
+      radial-gradient(120% 70% at 50% -10%, rgba(255,249,237,.55) 0%, transparent 60%),
+      var(--paper);
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+
+  #sky { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+  .wrap {
+    max-width: 1120px; margin: 0 auto;
+    padding-block: calc(26px + env(safe-area-inset-top, 0px)) 80px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    min-height: 100%;
+  }
+
+  h1, h2 { font-family: var(--display); margin: 0; font-weight: 600; text-wrap: balance; line-height: 1.05; }
+  h1 { font-size: clamp(2.3rem, 7vw, 3.9rem); letter-spacing: -.02em; }
+  p { margin: 0; line-height: 1.6; color: var(--ink-soft); }
+  .lede { font-size: clamp(1rem, 2.6vw, 1.12rem); max-width: 46ch; }
+  .eyebrow { font-family: var(--display); font-size: .74rem; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); }
+
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  :focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; border-radius: 6px; }
+
+  .btn {
+    font-family: var(--display); font-weight: 600;
+    background: var(--ink); color: var(--paper-2);
+    padding: 13px 26px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    transition: transform .12s ease, box-shadow .12s ease;
+    box-shadow: 0 4px 0 rgba(23,18,15,.25);
+    text-decoration: none;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(23,18,15,.25); }
+  .btn.sun { background: var(--accent); color: #17120F; box-shadow: 0 4px 0 rgba(23,18,15,.2); }
+  .btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+  .btn.ghost:active { transform: translateY(2px); box-shadow: inset 0 0 0 2px var(--line); }
+  .btn.sm { padding: 9px 18px; font-size: .92rem; box-shadow: none; }
+  .btn.ghost.sm { box-shadow: inset 0 0 0 2px var(--line); }
+  .btn.wide { width: 100%; }
+
+  .head { display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center; margin-bottom: 30px; }
+  .mark { display: inline-flex; align-items: center; gap: 9px; font-family: var(--display); font-weight: 600; font-size: 1.02rem; }
+  .mark .dot { width: 28px; height: 28px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; font-size: .95rem; color: #17120F; }
+
+  .fab {
+    position: fixed; z-index: 70;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + max(4px, env(safe-area-inset-right, 0px)));
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--paper-2); box-shadow: 0 4px 14px rgba(23,18,15,.18), inset 0 0 0 1.5px var(--line);
+    display: grid; place-items: center; font-size: 1.05rem;
+  }
+
+  .cols { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.9fr); gap: 26px; align-items: start; }
+  @media (max-width: 860px) { .cols { grid-template-columns: minmax(0,1fr); } }
+
+  .panel {
+    background: var(--paper-2); border: 1.5px solid var(--line); border-radius: 26px;
+    padding: 22px; box-shadow: 0 14px 34px rgba(23,18,15,.07);
+    display: flex; flex-direction: column; gap: 18px; min-width: 0;
+  }
+  .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .lbl { font-family: var(--display); font-size: .86rem; font-weight: 600; }
+  .hint { font-size: .78rem; color: var(--ink-soft); }
+  input[type=text], input[type=datetime-local], textarea {
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px;
+    padding: 11px 13px; width: 100%; font-size: .98rem;
+  }
+  textarea { font-family: var(--hand); font-style: var(--hand-style, normal); font-size: calc(1.3rem * var(--hand-scale, 1)); line-height: 1.35; resize: vertical; min-height: 150px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 440px) { .two { grid-template-columns: 1fr; } }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+  .sw { width: 36px; height: 36px; border-radius: 12px; box-shadow: inset 0 0 0 2px rgba(23,18,15,.12); transition: transform .14s ease; }
+  .sw[aria-pressed="true"] { transform: scale(1.12); box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 3px var(--paper-2), 0 0 0 5px var(--ink); }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    font-family: var(--display); font-size: .88rem; font-weight: 500;
+    padding: 8px 15px; border-radius: 999px;
+    background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--line);
+  }
+  .pill[aria-pressed="true"] { background: var(--ink); color: var(--paper-2); box-shadow: none; }
+  .pill.pen { font-size: 1.12rem; padding: 6px 16px; line-height: 1.25; }
+  .chip { width: 22px; height: 16px; border-radius: 4px; display: inline-block;
+    vertical-align: -3px; margin-right: 7px; border: 1px solid rgba(23,18,15,.22); }
+  .chip.cream { background: #FFFBF2; }
+  .chip.kraft { background: #DEBB8C; background-image: radial-gradient(rgba(90,60,30,.3) .8px, transparent 1px); background-size: 4px 4px; }
+  .chip.stripe { background: #FFFBF2; background-image: repeating-linear-gradient(90deg, rgba(23,18,15,.2) 0 2px, transparent 2px 5px); }
+  .chip.ruled { background: #FFFBF2; background-image: repeating-linear-gradient(transparent 0 4px, rgba(53,182,242,.7) 4px 5px); }
+  .chip.grid { background: #FFFBF2; background-image:
+      linear-gradient(rgba(23,18,15,.25) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23,18,15,.25) 1px, transparent 1px); background-size: 5px 5px; }
+  .chip.blush { background: #FBE2E8; }
+  .chip.sage { background: #E2EFE0; }
+  .chip.midnight { background: #1D1B33; background-image: radial-gradient(rgba(255,255,255,.7) .6px, transparent 1px); background-size: 6px 6px; }
+  .sample {
+    border-radius: 16px; padding: 16px 14px; margin-top: 4px;
+    border: 1.5px solid var(--line); text-align: center;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .sample .big { font-size: 1.5rem; line-height: 1.15; }
+  .sample .small { font-size: 1.05rem; opacity: .85; }
+
+  .stick { position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); }
+  .stage {
+    background: var(--paper-2); border: 1.5px solid var(--line); border-radius: 26px;
+    padding: 26px 20px; display: flex; flex-direction: column; align-items: center; gap: 18px;
+    box-shadow: 0 14px 34px rgba(23,18,15,.07);
+  }
+
+  .saved-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .saved-row:first-of-type { border-top: 0; }
+  .saved-row .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .88rem; }
+  .saved-row .when { font-size: .72rem; color: var(--ink-soft); }
+
+  .picedit { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; }
+  .picedit .chooser {
+    width: 100%; max-width: 320px; display: block;
+    border-radius: 14px; background: #1A1714; touch-action: none; cursor: move;
+  }
+  .picedit .row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .picedit .result { display: block; width: 104px; border-radius: 12px; border: 1.5px solid var(--line); box-shadow: 0 6px 16px rgba(23,18,15,.18); transform: rotate(-1.4deg); }
+  .picedit .result-cap { font-family: var(--display); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin-top: 8px; display: block; }
+  .picedit input[type=range] { width: 100%; max-width: 320px; accent-color: var(--accent); }
+
+  /* ---------------- envelopes ---------------- */
+  .env {
+    position: relative; width: min(320px, 78vw); aspect-ratio: 7 / 5;
+    border-radius: 16px; background: var(--env-bg, var(--accent));
+    box-shadow: 0 18px 40px rgba(23,18,15,.22);
+    overflow: visible;
+  }
+  .env .body { position: absolute; inset: 0; border-radius: 16px; overflow: hidden; z-index: 1; }
+  .env .flap {
+    position: absolute; inset: 0 0 auto; height: 60%;
+    background: rgba(255,255,255,.26);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    border-radius: 16px 16px 0 0;
+    transform-origin: top; transition: transform .6s cubic-bezier(.5,-.25,.3,1.4);
+    z-index: 3;
+  }
+  .env.open .flap { transform: rotateX(178deg); }
+  .env .seal {
+    position: absolute; left: 50%; top: 54%; transform: translate(-50%,-50%); z-index: 4;
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--candy); color: #fff;
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 1.5rem; font-weight: 600;
+    box-shadow: 0 5px 14px rgba(23,18,15,.3), inset 0 0 0 3px rgba(255,255,255,.35);
+    transition: transform .45s cubic-bezier(.4,-.4,.3,1.5), opacity .35s;
+  }
+  /* The wax cracks apart rather than simply fading. */
+  .env.open .seal { transform: translate(-50%,-50%) scale(1.35) rotate(22deg); opacity: 0; }
+  .env .stamp {
+    position: absolute; right: 12px; top: 12px; z-index: 4;
+    width: 54px; height: 62px; border-radius: 6px; background: var(--paper-2);
+    box-shadow: 0 3px 10px rgba(23,18,15,.22);
+    display: grid; place-items: center; padding: 4px;
+    font-family: var(--display); font-size: .58rem; text-align: center; line-height: 1.15;
+    transform: rotate(3deg); color: #17120F;
+  }
+  .env .stamp b { font-size: 1.1rem; display: block; }
+  .env .deco { position: absolute; inset: 0; overflow: hidden; border-radius: 16px; z-index: 2; pointer-events: none; }
+  .env .deco span { position: absolute; font-size: 18px; opacity: .62; }
+  .env .letter-peek {
+    position: absolute; left: 7%; right: 7%; bottom: 8%; height: 62%; z-index: 2;
+    background: #FFFBF2; border-radius: 10px;
+    box-shadow: 0 -2px 10px rgba(23,18,15,.12);
+    display: grid; place-items: end center; padding: 10px 10px 14px;
+    font-family: var(--hand); font-size: 1.15rem; color: #6B5F55; text-align: center;
+    transition: transform .55s ease .1s;
+  }
+  .env.open .letter-peek { transform: translateY(-24%); }
+  .env.away { animation: sink .45s ease-in both; }
+  @keyframes sink { to { transform: translateY(46px) scale(.86); opacity: 0 } }
+
+  /* Airmail: white card with the striped border and a par-avion mark. */
+  .env.airmail { --env-bg: #FDFBF6; }
+  .env.airmail .body {
+    border: 7px solid transparent;
+    background:
+      linear-gradient(#FDFBF6, #FDFBF6) padding-box,
+      repeating-linear-gradient(45deg, #D83A3A 0 10px, #FDFBF6 10px 20px, #2B5CB8 20px 30px, #FDFBF6 30px 40px) border-box;
+  }
+  .env.airmail .flap { background: rgba(43,92,184,.12); }
+  .env.airmail .seal { background: #2B5CB8; }
+  .env.airmail .mark {
+    position: absolute; left: 14px; bottom: 12px; z-index: 4;
+    font-family: var(--display); font-size: .6rem; letter-spacing: .2em;
+    text-transform: uppercase; color: #2B5CB8;
+  }
+
+  /* Window: a cut-out panel showing who it is for. */
+  .env.window .pane {
+    position: absolute; left: 10%; bottom: 14%; width: 56%; height: 28%; z-index: 4;
+    background: rgba(255,255,255,.9); border-radius: 6px;
+    box-shadow: inset 0 0 0 1.5px rgba(23,18,15,.14);
+    display: grid; place-items: center; padding: 4px;
+    font-family: var(--display); font-size: .82rem; color: #17120F;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .env.window .letter-peek { bottom: 46%; height: 36%; }
+
+  /* Kraft: brown paper, grain, and a twine cross. */
+  .env.kraft { --env-bg: #D7B183; }
+  .env.kraft .body {
+    background-image: radial-gradient(rgba(90,60,30,.12) 1px, transparent 1px);
+    background-size: 7px 7px;
+  }
+  .env.kraft .flap { background: rgba(120,84,44,.22); }
+  .env.kraft .twine {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    background:
+      linear-gradient(to right, transparent calc(50% - 1.5px), rgba(90,62,32,.65) calc(50% - 1.5px) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+      linear-gradient(to bottom, transparent calc(60% - 1.5px), rgba(90,62,32,.65) calc(60% - 1.5px) calc(60% + 1.5px), transparent calc(60% + 1.5px));
+  }
+  .env.kraft .seal { background: #A23B2A; }
+
+  /* Band: flat modern envelope, a colour band instead of a triangle flap. */
+  .env.band .flap {
+    height: 34%; clip-path: none; border-radius: 16px 16px 0 0;
+    background: rgba(23,18,15,.14);
+    transform-origin: top;
+  }
+  .env.band.open .flap { transform: rotateX(178deg); }
+  .env.band .seal { top: 34%; width: 52px; height: 52px; border-radius: 14px; }
+  .env.band .letter-peek { bottom: 10%; height: 56%; }
+
+  /* Postcard: no flap at all, a postmark and a written address. */
+  .env.postcard { --env-bg: #F7EEDC; }
+  .env.postcard .flap { display: none; }
+  .env.postcard .letter-peek {
+    left: 5%; right: 5%; bottom: 6%; height: 88%;
+    background: #FFFDF7; box-shadow: inset 0 0 0 1.5px rgba(23,18,15,.12);
+    display: block; text-align: left; padding: 14px 16px;
+  }
+  .env.postcard.open .letter-peek { transform: translateY(-6%) rotate(-1.5deg); }
+  .env.postcard .postmark {
+    position: absolute; right: 16px; top: 16px; z-index: 5;
+    width: 58px; height: 58px; border-radius: 50%;
+    border: 2px dashed rgba(23,18,15,.45);
+    display: grid; place-items: center; transform: rotate(-12deg);
+    font-family: var(--display); font-size: .55rem; text-align: center;
+    color: rgba(23,18,15,.6); line-height: 1.1;
+  }
+  .env.postcard .seal { left: auto; right: 22px; bottom: 16px; top: auto; transform: none; width: 44px; height: 44px; font-size: 1.1rem; }
+  .env.postcard.open .seal { transform: scale(1.3) rotate(22deg); }
+  .env.postcard .stamp { display: none; }
+
+  /* Gift: tied with a ribbon and a bow instead of a wax seal. */
+  .env.gift .ribbon {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: 16px; overflow: hidden;
+    background:
+      linear-gradient(to right, transparent calc(50% - 10px), rgba(255,255,255,.78) calc(50% - 10px) calc(50% + 10px), transparent calc(50% + 10px)),
+      linear-gradient(to bottom, transparent calc(58% - 10px), rgba(255,255,255,.62) calc(58% - 10px) calc(58% + 10px), transparent calc(58% + 10px));
+  }
+  .env.gift .bow {
+    position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%); z-index: 5;
+    font-size: 30px; transition: transform .45s ease, opacity .35s;
+  }
+  .env.gift.open .bow { transform: translate(-50%,-180%) rotate(18deg); opacity: 0; }
+  .env.gift .seal { display: none; }
+
+  /* Night: deep sky, gold seal, a little moon. */
+  .env.night { --env-bg: #171438; }
+  .env.night .body {
+    background-image: radial-gradient(rgba(255,255,255,.8) .9px, transparent 1.3px);
+    background-size: 23px 23px;
+  }
+  .env.night .flap { background: rgba(255,255,255,.08); }
+  .env.night .seal { background: #F0C04A; color: #2A2410; }
+  .env.night .letter-peek { background: #241F4C; color: #D7D1F2; }
+  .env.night .moon { position: absolute; left: 14px; top: 11px; z-index: 4; font-size: 19px; }
+
+  .tapnote { font-family: var(--display); font-size: .86rem; color: var(--ink-soft); }
+
+  /* ---------------- the letter and its papers ---------------- */
+  .letter {
+    --sheet: #FFFBF2; --sheet-ink: #17120F; --sheet-soft: #6B5F55;
+    background: var(--sheet); color: var(--sheet-ink);
+    border-radius: 24px; padding: 26px 24px 28px;
+    box-shadow: 0 22px 50px rgba(23,18,15,.18); border: 1.5px solid rgba(23,18,15,.14);
+    width: 100%; max-width: 540px;
+    display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center;
+    animation: rise .55s cubic-bezier(.2,.9,.3,1) both;
+  }
+  .letter.kraft {
+    --sheet: #DEBB8C; --sheet-ink: #3B2A17; --sheet-soft: #6E553A;
+    background-image: radial-gradient(rgba(90,60,30,.09) 1px, transparent 1px);
+    background-size: 7px 7px;
+  }
+  .letter.stripe { background-image: repeating-linear-gradient(90deg, rgba(23,18,15,.045) 0 10px, transparent 10px 22px); }
+  .letter.ruled { background-image: repeating-linear-gradient(transparent 0 31px, rgba(53,182,242,.25) 31px 32px); }
+  .letter.grid {
+    background-image:
+      linear-gradient(rgba(23,18,15,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23,18,15,.07) 1px, transparent 1px);
+    background-size: 23px 23px;
+  }
+  .letter.blush { --sheet: #FBE2E8; --sheet-ink: #44202B; --sheet-soft: #7C5661; }
+  .letter.sage { --sheet: #E4EFE2; --sheet-ink: #1F3020; --sheet-soft: #536850; }
+  .letter.midnight {
+    --sheet: #1D1B33; --sheet-ink: #F6F1E6; --sheet-soft: #B8B2CC;
+    border-color: rgba(255,255,255,.12);
+    background-image: radial-gradient(rgba(255,255,255,.5) .9px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .letter .frame {
+    position: relative; width: 100%; max-width: 320px; aspect-ratio: var(--fit, 4/3);
+    border-radius: 16px; overflow: hidden; transform: rotate(-1.4deg);
+    box-shadow: 0 10px 24px rgba(23,18,15,.25);
+    background: linear-gradient(100deg, rgba(23,18,15,.07) 30%, rgba(23,18,15,.13) 50%, rgba(23,18,15,.07) 70%);
+    background-size: 300% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+  .letter .frame.ready { animation: none; background: transparent; }
+  .letter .frame.tall { max-width: 250px; }
+  .letter .photo {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    opacity: 0; transition: opacity .35s ease;
+  }
+  /* Shown only once the whole picture has arrived: a half-drawn photo on a
+     slow phone connection looks broken. */
+  .letter .frame.ready .photo { opacity: 1; }
+  @keyframes shimmer { from { background-position: 100% 0 } to { background-position: -100% 0 } }
+  .letter .msg { font-family: var(--hand); font-style: var(--hand-style, normal); font-size: calc(clamp(1.35rem, 5vw, 1.72rem) * var(--hand-scale, 1)); line-height: 1.38; color: var(--sheet-ink); white-space: pre-wrap; max-width: 30ch; }
+  .letter .sign { font-family: var(--hand); font-style: var(--hand-style, normal); font-size: calc(clamp(1.4rem, 5.4vw, 1.85rem) * var(--hand-scale, 1)); font-weight: 700; color: var(--candy); display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .letter .sign svg { width: 62%; height: 10px; overflow: visible; }
+  .letter .sign path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 230; stroke-dashoffset: 230; animation: ink 1.1s 1s ease-out forwards; }
+  @keyframes ink { to { stroke-dashoffset: 0 } }
+  /* Everything on an opened letter arrives one piece after another. The
+     sample in the workbench shares the class, so this is scoped to the card. */
+  .card-stage .letter { animation: unfold .75s cubic-bezier(.2,.9,.3,1) both; transform-origin: 50% 100%; }
+  @keyframes unfold { from { transform: translateY(70px) scale(.9) rotateX(14deg); opacity: 0 } to { transform: none; opacity: 1 } }
+  .card-stage .letter > * { animation: popIn .6s cubic-bezier(.2,.9,.3,1.25) both; animation-delay: calc(var(--i, 0) * 110ms + 180ms); }
+  @keyframes popIn { from { transform: translateY(16px) scale(.96); opacity: 0 } to { transform: none; opacity: 1 } }
+  .card-stage .msg .w { display: inline-block; animation: wordIn .45s cubic-bezier(.2,.9,.3,1.3) both; }
+  @keyframes wordIn { from { transform: translateY(8px); opacity: 0 } to { transform: none; opacity: 1 } }
+  .letter .frame { transition: transform .55s cubic-bezier(.2,1.3,.3,1), box-shadow .3s; }
+  .letter .frame.straight { transform: rotate(0) scale(1.04); box-shadow: 0 18px 36px rgba(23,18,15,.3); }
+  .letter .play-nudge {
+    margin-top: 6px; font-family: var(--display); font-weight: 600; font-size: .9rem;
+    padding: 9px 16px; border-radius: 999px; background: #1DB954; color: #fff;
+    box-shadow: 0 4px 0 rgba(23,18,15,.2);
+  }
+  #drift { position: fixed; inset: 0; pointer-events: none; z-index: 55; overflow: hidden; }
+  #drift span { position: absolute; bottom: -50px; opacity: 0; animation: driftUp linear both; will-change: transform; }
+  @keyframes driftUp {
+    0% { transform: translateY(0) translateX(0) rotate(0); opacity: 0 }
+    12% { opacity: .85 }
+    50% { transform: translateY(-55vh) translateX(26px) rotate(18deg) }
+    100% { transform: translateY(-112vh) translateX(-18px) rotate(-24deg); opacity: 0 }
+  }
+  .letter.midnight .sign { color: var(--sun); }
+  .letter .to { font-family: var(--display); font-size: .78rem; letter-spacing: .2em; text-transform: uppercase; color: var(--sheet-soft); }
+  .letter h1 { color: var(--sheet-ink); }
+  .letter .song { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 6px; }
+  .letter .song .cap { font-family: var(--display); font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; color: var(--sheet-soft); }
+  .letter iframe { width: 100%; border: 0; border-radius: 14px; display: block; }
+  .letter iframe.yt { aspect-ratio: 16/9; height: auto; }
+
+  /* A long letter turns over instead of running down the screen. */
+  .pager { display: flex; align-items: center; gap: 12px; color: var(--sheet-soft); }
+  .pager button {
+    font-family: var(--display); font-weight: 600; font-size: .86rem;
+    padding: 6px 15px; border-radius: 999px; color: inherit;
+    box-shadow: inset 0 0 0 1.5px currentColor;
+  }
+  .pager button[disabled] { opacity: .3; cursor: default; }
+  .pager .dots { font-family: var(--display); font-size: .78rem; letter-spacing: .1em; }
+
+  .card-stage { min-height: calc(100vh - 110px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; }
+
+  .previewbar {
+    position: fixed; left: 0; right: 0; z-index: 75;
+    bottom: 0; padding: 12px max(16px, env(safe-area-inset-left, 0px));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    background: rgba(251,243,228,.94); backdrop-filter: blur(8px);
+    border-top: 1.5px solid var(--line);
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+  }
+  :root[data-theme="night"] .previewbar { background: rgba(20,18,26,.94); }
+
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 80;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    background: var(--ink); color: var(--paper-2);
+    font-family: var(--display); font-size: .92rem;
+    padding: 11px 20px; border-radius: 999px;
+    box-shadow: 0 10px 24px rgba(23,18,15,.3); max-width: 90vw;
+  }
+
+  .linkbox { display: flex; flex-direction: column; gap: 8px; }
+  .linkbox textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .74rem; min-height: 72px; line-height: 1.35; }
+
+  @keyframes rise { from { transform: translateY(14px); opacity: 0 } to { transform: none; opacity: 1 } }
+  @keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+  .floaty { animation: float 3.6s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+
+  /* Paper, properly. */
+  @media print {
+    body { background: #fff !important; }
+    #sky, .previewbar, .pills, .head, .fab, .toast, .pager, .tapnote, .eyebrow { display: none !important; }
+    .wrap { padding: 0; }
+    .card-stage { min-height: auto; display: block; }
+    .letter {
+      box-shadow: none; border: 1px solid #DDD; max-width: 100%;
+      background: #fff !important; color: #000 !important;
+      --sheet-ink: #000; --sheet-soft: #555;
+      animation: none; page-break-inside: avoid;
+    }
+    .letter .msg, .letter .sign { color: #000 !important; }
+    .letter .song, .letter iframe { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="sky"></canvas>
+<button class="fab" id="theme" hidden aria-pressed="false" aria-label="Switch to dark workbench">&#9790;</button>
+<div class="wrap" id="app"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var DEFAULT = {
+    to: "",
+    from: "",
+    headline: "",
+    front: "",
+    message: "",
+    start: "",
+    colour: "sun",
+    style: "classic",
+    pattern: "confetti",
+    photo: "",
+    shot: "",
+    song: "",
+    reply: "",
+    pen: "caveat",
+    sheet: "cream",
+    fit: ""
+  };
+
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var app = document.getElementById('app');
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+
+  var COLOURS = [
+    { id: 'sun', hex: '#F5B931', name: 'Sunshine' },
+    { id: 'candy', hex: '#FF5FA2', name: 'Candy' },
+    { id: 'sky', hex: '#35B6F2', name: 'Sky' },
+    { id: 'grass', hex: '#2FCF9E', name: 'Grass' },
+    { id: 'coral', hex: '#FF6B4A', name: 'Coral' },
+    { id: 'grape', hex: '#9B7BFF', name: 'Grape' }
+  ];
+  var STYLES = {
+    classic: 'Classic', airmail: 'Airmail', window: 'Window',
+    kraft: 'Kraft & twine', band: 'Modern band', postcard: 'Postcard',
+    gift: 'Ribbon & bow', night: 'Night sky'
+  };
+  /* Airmail, kraft, postcard and night carry their own paper colour. */
+  var FIXED_COLOUR = { airmail: 1, kraft: 1, postcard: 1, night: 1 };
+  var PATTERNS = {
+    none: [],
+    confetti: ['✦', '●', '▲', '✦', '●', '■', '✦', '●', '▲', '■', '✦', '●'],
+    flowers: ['✿', '❀', '✿', '❁', '❀', '✿', '❁', '✿', '❀', '✿'],
+    stars: ['✧', '★', '✦', '✧', '★', '✦', '✧', '★', '✦', '✧'],
+    hearts: ['♥', '♡', '♥', '♡', '♥', '♡', '♥', '♡', '♥'],
+    balloons: ['🎈', '🎉', '🎈', '🎊', '🎈', '🎉', '🎈'],
+    snow: ['❄', '❅', '❆', '❄', '❅', '❄', '❆', '❄', '❅'],
+    music: ['♪', '♫', '♬', '♪', '♫', '♪', '♬', '♫', '♪']
+  };
+  var PATTERN_NAMES = {
+    none: 'Plain', confetti: 'Confetti', flowers: 'Flowers', stars: 'Stars',
+    hearts: 'Hearts', balloons: 'Balloons', snow: 'Snow', music: 'Notes'
+  };
+  /* Ten pens: half of them romantic scripts, and Poppins for a clean,
+     modern letter. A pen a card named before this change falls back to the
+     first one rather than failing. */
+  var PENS = {
+    caveat: "'Caveat', cursive",
+    dancing: "'Dancing Script', cursive",
+    greatvibes: "'Great Vibes', cursive",
+    parisienne: "'Parisienne', cursive",
+    sacramento: "'Sacramento', cursive",
+    satisfy: "'Satisfy', cursive",
+    pacifico: "'Pacifico', cursive",
+    patrick: "'Patrick Hand', cursive",
+    playfair: "'Playfair Display', Georgia, serif",
+    poppins: "'Poppins', 'Segoe UI', sans-serif"
+  };
+  var PEN_NAMES = {
+    caveat: 'Flowing', dancing: 'Elegant', greatvibes: 'Romantic', parisienne: 'Parisian',
+    sacramento: 'Love letter', satisfy: 'Satisfy', pacifico: 'Sunny', patrick: 'Neat',
+    playfair: 'Classic', poppins: 'Clean'
+  };
+  /* Thin scripts are set larger so a letter in them is still easy to read. */
+  var PEN_SCALE = {
+    caveat: 1, dancing: 1.02, greatvibes: 1.28, parisienne: 1.22, sacramento: 1.3,
+    satisfy: 1.06, pacifico: .92, patrick: .98, playfair: .86, poppins: .8
+  };
+  var PEN_STYLE = { playfair: 'italic' };
+  /* What Google Fonts is asked for, and the bare name a canvas needs. */
+  var PEN_FAMILY = {
+    caveat: 'Caveat:wght@500;600;700',
+    dancing: 'Dancing+Script:wght@500;600;700',
+    greatvibes: 'Great+Vibes',
+    parisienne: 'Parisienne',
+    sacramento: 'Sacramento',
+    satisfy: 'Satisfy',
+    pacifico: 'Pacifico',
+    patrick: 'Patrick+Hand',
+    playfair: 'Playfair+Display:ital,wght@0,500;0,700;1,500;1,700',
+    poppins: 'Poppins:wght@400;500;600'
+  };
+  var PEN_CANVAS = {
+    caveat: 'Caveat', dancing: 'Dancing Script', greatvibes: 'Great Vibes',
+    parisienne: 'Parisienne', sacramento: 'Sacramento', satisfy: 'Satisfy',
+    pacifico: 'Pacifico', patrick: 'Patrick Hand', playfair: 'Playfair Display',
+    poppins: 'Poppins'
+  };
+  var FITS = { '4x3': '4/3', '1x1': '1/1', '3x4': '3/4' };
+  var SHEETS = {
+    cream: 'Cream', kraft: 'Kraft', stripe: 'Striped', ruled: 'Ruled',
+    grid: 'Grid', blush: 'Blush', sage: 'Sage', midnight: 'Midnight'
+  };
+  /* The colours a sheet turns into on a saved picture. */
+  var SHEET_INK = {
+    cream: ['#FFFBF2', '#17120F', '#6B5F55'],
+    kraft: ['#DEBB8C', '#3B2A17', '#6E553A'],
+    stripe: ['#FFFBF2', '#17120F', '#6B5F55'],
+    ruled: ['#FFFBF2', '#17120F', '#6B5F55'],
+    grid: ['#FFFBF2', '#17120F', '#6B5F55'],
+    blush: ['#FBE2E8', '#44202B', '#7C5661'],
+    sage: ['#E4EFE2', '#1F3020', '#536850'],
+    midnight: ['#1D1B33', '#F6F1E6', '#B8B2CC']
+  };
+
+  var OCCASIONS = [
+    { id: 'birthday', name: 'Birthday', headline: 'Happy birthday', colour: 'sun', pattern: 'balloons', style: 'classic', sheet: 'cream', pen: 'caveat' },
+    { id: 'thanks', name: 'Thank you', headline: 'Thank you', colour: 'grass', pattern: 'flowers', style: 'window', sheet: 'sage', pen: 'patrick' },
+    { id: 'congrats', name: 'Congratulations', headline: 'Congratulations', colour: 'sky', pattern: 'stars', style: 'band', sheet: 'stripe', pen: 'pacifico' },
+    { id: 'love', name: 'Love', headline: 'I love you', colour: 'candy', pattern: 'hearts', style: 'classic', sheet: 'blush', pen: 'greatvibes' },
+    { id: 'sorry', name: 'Sorry', headline: 'I am sorry', colour: 'grape', pattern: 'none', style: 'classic', sheet: 'blush', pen: 'sacramento' },
+    { id: 'getwell', name: 'Get well', headline: 'Get well soon', colour: 'grass', pattern: 'flowers', style: 'classic', sheet: 'sage', pen: 'satisfy' },
+    { id: 'christmas', name: 'Christmas', headline: 'Merry Christmas', colour: 'coral', pattern: 'snow', style: 'night', sheet: 'midnight', pen: 'parisienne' },
+    { id: 'justbecause', name: 'Just because', headline: 'Thinking of you', colour: 'grape', pattern: 'stars', style: 'kraft', sheet: 'kraft', pen: 'dancing' }
+  ];
+  var PRESET_HEADS = {};
+  OCCASIONS.forEach(function (o) { PRESET_HEADS[o.headline.toLowerCase()] = 1; });
+
+  function hex(id) {
+    for (var i = 0; i < COLOURS.length; i++) if (COLOURS[i].id === id) return COLOURS[i].hex;
+    return COLOURS[0].hex;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  /* ---------------- fonts on demand ---------------- */
+  /* Caveat already came down with the page. */
+  var penLoaded = { caveat: 1 };
+  function ensurePen(id) {
+    var fam = PEN_FAMILY[id];
+    if (!fam || penLoaded[id]) return;
+    penLoaded[id] = 1;
+    var l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=' + fam + '&display=swap';
+    document.head.appendChild(l);
+  }
+  /* The workbench shows every pen in its own hand, so it wants them all --
+     but only once the editor itself is on screen. */
+  function ensureAllPens() {
+    var keys = Object.keys(PEN_FAMILY);
+    var go = function () { keys.forEach(ensurePen); };
+    if (window.requestIdleCallback) window.requestIdleCallback(go, { timeout: 1500 });
+    else setTimeout(go, 400);
+  }
+
+  /* ---------------- songs ---------------- */
+  function songToken(raw) {
+    var s = String(raw || '').trim();
+    if (!s) return '';
+    var m = s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,20})/);
+    if (m) return 'y:' + m[1];
+    m = s.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(track|album|playlist|episode)\/([A-Za-z0-9]{10,40})/);
+    if (m) return 's:' + m[1] + '/' + m[2];
+    if (/^y:[A-Za-z0-9_-]{6,20}$/.test(s)) return s;
+    if (/^s:(track|album|playlist|episode)\/[A-Za-z0-9]{10,40}$/.test(s)) return s;
+    return '';
+  }
+  /* The box shows a real address again, not the short token we store. */
+  function songUrl(token) {
+    if (!token) return '';
+    if (token.slice(0, 2) === 'y:') return 'https://youtu.be/' + token.slice(2);
+    if (token.slice(0, 2) === 's:') return 'https://open.spotify.com/' + token.slice(2);
+    return '';
+  }
+  /* "1:30" or "90" both mean ninety seconds. */
+  function startSeconds(v) {
+    var t = String(v || '').trim();
+    if (!t) return 0;
+    var m = t.match(/^(\d{1,3}):([0-5]?\d)$/);
+    if (m) return (parseInt(m[1], 10) * 60) + parseInt(m[2], 10);
+    if (/^\d{1,5}$/.test(t)) return parseInt(t, 10);
+    return 0;
+  }
+  /* 's:track/ID' becomes the URI Spotify's player wants. */
+  function spotifyUri(token) {
+    var m = String(token || '').match(/^s:(track|album|playlist|episode)\/([A-Za-z0-9]{10,40})$/);
+    return m ? 'spotify:' + m[1] + ':' + m[2] : '';
+  }
+  function songEmbed(token, start) {
+    if (!token) return '';
+    if (token.slice(0, 2) === 'y:') {
+      var id = token.slice(2);
+      if (!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return '';
+      var at = startSeconds(start);
+      return '<div class="song"><span class="cap">Their song</span>' +
+        '<iframe class="yt" src="https://www.youtube-nocookie.com/embed/' + id +
+        '?autoplay=1&playsinline=1&rel=0' + (at ? '&start=' + at : '') + '" title="Song" ' +
+        'allow="autoplay; accelerometer; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';
+    }
+    if (token.slice(0, 2) === 's:') {
+      if (!spotifyUri(token)) return '';
+      /* The player is put in this box by Spotify's own script once the letter
+         is open, so it can be told to start. */
+      return '<div class="song" id="songBox"><span class="cap">Their song</span><div id="spotifyBox"></div></div>';
+    }
+    return '';
+  }
+  function spotifyPlainIframe(token) {
+    var path = token.slice(2);
+    return '<iframe src="https://open.spotify.com/embed/' + path + '" title="Song" height="152" ' +
+      'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>';
+  }
+
+  /* ---------------- reply ---------------- */
+  function replyHref(who) {
+    who = String(who || '').trim();
+    if (!who) return '';
+    var note = 'Thank you for my card';
+    if (who.indexOf('@') > -1 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(who)) {
+      return 'mailto:' + who + '?subject=' + encodeURIComponent(note);
+    }
+    var digits = who.replace(/[^0-9]/g, '');
+    if (digits.length < 7) return '';
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(note);
+  }
+  function replyHTML(d) {
+    var href = replyHref(d.reply);
+    if (!href) return '';
+    var mail = href.slice(0, 7) === 'mailto:';
+    return '<a class="btn ghost sm" id="replyBtn" href="' + esc(href) + '"' +
+      (mail ? '' : ' target="_blank" rel="noopener"') + '>Say thank you</a>';
+  }
+
+  /* ---------------- link encoding ---------------- */
+  function b64url(bin) {
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function unb64url(s) {
+    var b = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    return b;
+  }
+  /* Plain text costs one character per letter here, where base64 cost four for
+     every three. A whole card is usually under 600 characters, which keeps
+     chat apps happy. Fields are separated by ~, so a typed ~ is escaped.
+     Two slots, tune and until, once held features since taken out. They are
+     kept empty rather than removed so that every card sent before still opens. */
+  var FIELDS = ['to', 'from', 'headline', 'message', 'colour', 'pattern', 'tune',
+    'photo', 'song', 'reply', 'pen', 'sheet', 'style', 'front', 'start', 'until', 'fit'];
+
+  function packField(v) {
+    return encodeURIComponent(String(v == null ? '' : v))
+      .replace(/~/g, '%7E').replace(/%20/g, '+');
+  }
+  function unpackField(v) {
+    return decodeURIComponent(String(v).replace(/\+/g, '%20'));
+  }
+  function encode(d) {
+    var out = ['1'];
+    for (var i = 0; i < FIELDS.length; i++) out.push(packField(d[FIELDS[i]] || ''));
+    return out.join('~');
+  }
+  function decode(s) {
+    var raw = String(s || '');
+    if (raw.slice(0, 2) === '1~') {
+      try {
+        var parts = raw.split('~'), d = { shot: '' };
+        if (parts.length < 5) return null;
+        for (var i = 0; i < FIELDS.length; i++) d[FIELDS[i]] = unpackField(parts[i + 1] || '');
+        d.colour = d.colour || 'sun';
+        d.pattern = d.pattern || 'none';
+        d.pen = d.pen || 'caveat';
+        d.sheet = d.sheet || 'cream';
+        d.style = d.style || 'classic';
+        return d;
+      } catch (e) { return null; }
+    }
+    /* Cards sent before the plain-text format still open. */
+    try {
+      var bin = atob(unb64url(decodeURIComponent(raw))), bytes = new Uint8Array(bin.length);
+      for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      var a = JSON.parse(new TextDecoder().decode(bytes));
+      if (!a || !a.length) return null;
+      return { to: a[0], from: a[1], headline: a[2], message: a[3], colour: a[4] || 'sun',
+        pattern: a[5] || 'none', photo: a[7] || '', song: a[8] || '',
+        reply: a[9] || '', pen: a[10] || 'caveat', sheet: a[11] || 'cream',
+        style: a[12] || 'classic', front: '', start: '', until: '', fit: '', shot: '' };
+    } catch (e) { return null; }
+  }
+  function cardUrl(d) {
+    return location.origin + location.pathname + '?c=' + encode(d) +
+      (d.shot ? '&p=' + d.shot.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : '');
+  }
+
+  /* ---------------- confetti ---------------- */
+  var cv = document.getElementById('sky'), ctx = cv.getContext('2d'), bits = [], running = false;
+  function sizeSky() {
+    var d = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = innerWidth * d; cv.height = innerHeight * d;
+    cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  sizeSky();
+  addEventListener('resize', sizeSky);
+  function burst(x, y, n) {
+    if (reduce) return;
+    var pal = ['#F5B931', '#FF5FA2', '#35B6F2', '#2FCF9E', '#FF6B4A', '#9B7BFF'];
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 9;
+      bits.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 4,
+        w: 6 + Math.random() * 7, h: 4 + Math.random() * 6,
+        c: pal[(Math.random() * pal.length) | 0], r: Math.random() * 6, vr: (Math.random() - .5) * .3,
+        life: 110 + Math.random() * 60 });
+    }
+    if (bits.length > 800) bits.splice(0, bits.length - 800);
+    if (!running) { running = true; requestAnimationFrame(tick); }
+  }
+  function rain(n) { if (reduce) return; for (var i = 0; i < n; i++) burst(Math.random() * innerWidth, -20 - Math.random() * 140, 1); }
+  function tick() {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    for (var i = bits.length - 1; i >= 0; i--) {
+      var b = bits[i];
+      b.vy += .22; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.life--;
+      if (b.life < 0 || b.y > innerHeight + 60) { bits.splice(i, 1); continue; }
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r);
+      ctx.globalAlpha = Math.min(1, b.life / 40); ctx.fillStyle = b.c;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.restore();
+    }
+    if (bits.length) requestAnimationFrame(tick); else running = false;
+  }
+
+  /* ---------------- the sound of opening ---------------- */
+  /* No background music any more, just the short noise an envelope makes.
+     It only ever fires on a tap, which is what browsers allow, and it stays
+     silent for anyone who has asked for less movement. */
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ac = null, gain = null;
+  function startAudio() {
+    if (!AC || reduce) return false;
+    try {
+      if (!ac) { ac = new AC(); gain = ac.createGain(); gain.gain.value = .22; gain.connect(ac.destination); }
+      if (ac.state === 'suspended') ac.resume();
+      return true;
+    } catch (e) { return false; }
+  }
+  function note(f, at, dur, vol) {
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'triangle'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + .02);
+    g.gain.exponentialRampToValueAtTime(.0001, at + dur);
+    o.connect(g); g.connect(gain); o.start(at); o.stop(at + dur + .05);
+  }
+  function chime(seq) {
+    if (!startAudio()) return;
+    var t = ac.currentTime;
+    for (var i = 0; i < seq.length; i++) note(seq[i], t + i * .075, .22, .4);
+  }
+  /* A short band-passed hiss: paper sliding out of paper. */
+  function rustle() {
+    if (!startAudio()) return;
+    try {
+      var len = Math.floor(ac.sampleRate * .38);
+      var buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) {
+        var e = 1 - (i / len);
+        ch[i] = (Math.random() * 2 - 1) * e * e * .6;
+      }
+      var src = ac.createBufferSource(); src.buffer = buf;
+      var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2700; bp.Q.value = .7;
+      src.connect(bp); bp.connect(gain); src.start();
+    } catch (e) { /* no sound is not a failure */ }
+  }
+
+  function toast(text) {
+    var old = $('.toast');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var el = document.createElement('div');
+    el.className = 'toast'; el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 3200);
+  }
+
+  /* ---------------- the dark workbench ---------------- */
+  function theme() {
+    try { return localStorage.getItem('pp_theme') || ''; } catch (e) { return ''; }
+  }
+  function setTheme(v) {
+    try { v ? localStorage.setItem('pp_theme', v) : localStorage.removeItem('pp_theme'); } catch (e) { /* private window */ }
+  }
+  function applyTheme(on) {
+    var root = document.documentElement;
+    if (on) root.setAttribute('data-theme', 'night');
+    else root.removeAttribute('data-theme');
+    var b = document.getElementById('theme');
+    b.innerHTML = on ? '&#9728;' : '&#9790;';
+    b.setAttribute('aria-pressed', String(!!on));
+    b.setAttribute('aria-label', on ? 'Switch to light workbench' : 'Switch to dark workbench');
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', on ? '#14121A' : '#FBF3E4');
+  }
+  document.getElementById('theme').addEventListener('click', function () {
+    var on = document.documentElement.getAttribute('data-theme') !== 'night';
+    setTheme(on ? 'night' : 'day');
+    applyTheme(on);
+  });
+
+  /* ---------------- envelope drawing ---------------- */
+  function envelopeHTML(d, sealed) {
+    var peek = String(d.front == null ? '' : d.front);
+    var style = STYLES[d.style] ? d.style : 'classic';
+    var marks = PATTERNS[d.pattern] || [], deco = '';
+    for (var i = 0; i < marks.length; i++) {
+      deco += '<span style="left:' + (6 + (i * 37) % 86) + '%;top:' + (8 + (i * 53) % 80) +
+        '%;transform:rotate(' + (((i * 47) % 90) - 45) + 'deg)">' + marks[i] + '</span>';
+    }
+    var initial = (String(d.to || '?').trim().charAt(0) || '?').toUpperCase();
+    var today = new Date();
+    var stampDate = today.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    var bg = FIXED_COLOUR[style] ? '' : ' style="--env-bg:' + hex(d.colour) + '"';
+    var extra = '';
+    if (style === 'airmail') extra = '<span class="mark">par avion</span>';
+    if (style === 'window') extra = '<span class="pane">' + esc(peek || ('To ' + (d.to || ''))) + '</span>';
+    if (style === 'kraft') extra = '<span class="twine"></span>';
+    if (style === 'postcard') extra = '<span class="postmark">' + esc(stampDate) + '<br>POST</span>';
+    if (style === 'gift') extra = '<span class="ribbon"></span><span class="bow">🎀</span>';
+    if (style === 'night') extra = '<span class="moon">🌙</span>';
+    return '<button class="env floaty ' + style + (sealed ? ' sealed' : '') + '" id="env"' + bg +
+      ' aria-label="' + (sealed ? 'This card is not open yet' : 'Open the envelope') + '">' +
+      '<span class="body"></span>' +
+      '<span class="deco">' + deco + '</span>' +
+      '<span class="stamp"><b>&#9993;</b>' + stampDate + '</span>' +
+      extra +
+      '<span class="letter-peek">' + esc(peek) + '</span>' +
+      '<span class="flap"></span>' +
+      '<span class="seal">' + esc(initial) + '</span>' +
+      '</button>';
+  }
+
+  function applyPen(d) {
+    var id = PENS[d.pen] ? d.pen : 'caveat';
+    ensurePen(id);
+    var root = document.documentElement.style;
+    root.setProperty('--hand', PENS[id]);
+    root.setProperty('--hand-scale', String(PEN_SCALE[id] || 1));
+    root.setProperty('--hand-style', PEN_STYLE[id] || 'normal');
+  }
+
+  /* ---------------- long letters turn over ---------------- */
+  function breakAt(s) {
+    var i = s.lastIndexOf('\n\n'); if (i > 280) return i;
+    i = s.lastIndexOf('\n'); if (i > 280) return i;
+    var a = s.lastIndexOf('. '), b = s.lastIndexOf('! '), c = s.lastIndexOf('? ');
+    i = Math.max(a, Math.max(b, c)); if (i > 280) return i + 1;
+    i = s.lastIndexOf(' '); if (i > 280) return i;
+    return s.length;
+  }
+  function pages(msg) {
+    var t = String(msg == null ? '' : msg).trim();
+    if (t.length <= 640) return [t];
+    var out = [], rest = t, guard = 0;
+    while (rest.length > 640 && out.length < 3 && guard++ < 10) {
+      var cut = breakAt(rest.slice(0, 680));
+      if (cut < 200) cut = 640;
+      out.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) out.push(rest);
+    return out;
+  }
+
+  /* ---------------- Spotify, told to start ---------------- */
+  /* A plain Spotify embed waits for a press. Their player script lets the
+     page press it instead, and the tap that opened the envelope is what
+     allows sound. The script is fetched while the envelope is still shut, so
+     it is ready by the time the letter is out. If the script never arrives,
+     the ordinary embed is shown and the listener presses play. */
+  var spotifyApi = null, songWanted = null, spotifyCtl = null;
+  window.onSpotifyIframeApiReady = function (api) {
+    spotifyApi = api;
+    if (songWanted) mountSpotify();
+  };
+  function loadSpotifyApi() {
+    if (document.getElementById('spotifyApi')) return;
+    var sc = document.createElement('script');
+    sc.id = 'spotifyApi'; sc.async = true;
+    sc.src = 'https://open.spotify.com/embed/iframe-api/v1';
+    document.head.appendChild(sc);
+  }
+  function mountSpotify() {
+    var box = document.getElementById('spotifyBox');
+    var want = songWanted;
+    if (!box || !spotifyApi || !want) return;
+    songWanted = null;
+    var started = false, sought = false;
+    try {
+      spotifyApi.createController(box, { uri: want.uri, width: '100%', height: 152 }, function (ctl) {
+        spotifyCtl = ctl;
+        var press = function () { try { ctl.play(); } catch (e) { /* the nudge below */ } };
+        ctl.addListener('ready', function () { press(); setTimeout(press, 900); });
+        ctl.addListener('playback_update', function (e) {
+          var d = (e && e.data) || e || {};
+          if (d.isPaused === false) {
+            started = true;
+            playNudge(false);
+            if (!sought && want.start > 0) {
+              sought = true;
+              try { ctl.seek(want.start); } catch (err) { /* previews cannot skip */ }
+            }
+          }
+        });
+      });
+    } catch (e) {
+      box.innerHTML = spotifyPlainIframe(want.token);
+      return;
+    }
+    setTimeout(function () { if (!started) playNudge(true); }, 3500);
+  }
+  function playNudge(show) {
+    var old = $('#playNudge');
+    if (old) old.parentNode.removeChild(old);
+    if (!show) return;
+    var sb = $('#songBox');
+    if (!sb) return;
+    var b = document.createElement('button');
+    b.id = 'playNudge'; b.className = 'play-nudge';
+    b.textContent = '▶ Tap to play the song';
+    b.addEventListener('click', function () {
+      try { if (spotifyCtl) spotifyCtl.play(); } catch (e) { /* nothing more to try */ }
+      playNudge(false);
+    });
+    sb.appendChild(b);
+  }
+
+  /* ---------------- card mode ---------------- */
+  /* opts.preview adds the bar that takes you back to the editor. */
+  function renderCard(d, opts) {
+    opts = opts || {};
+    applyTheme(false);
+    document.getElementById('theme').hidden = true;
+    applyPen(d);
+    if (d.song && d.song.charAt(0) === 's') loadSpotifyApi();
+
+    app.innerHTML =
+      '<div class="card-stage" id="cardStage">' +
+        '<span class="eyebrow">For ' + esc(d.to) + '</span>' +
+        envelopeHTML(d, false) +
+        '<p class="tapnote">A letter from ' + esc(d.from) + '</p>' +
+      '</div>';
+
+    var env = document.getElementById('env');
+    env.addEventListener('click', function () {
+      if (env.className.indexOf(' open') > -1) return;
+      env.className += ' open';
+      rustle();
+      var r = env.getBoundingClientRect();
+      burst(r.left + r.width / 2, r.top + r.height / 2, 70);
+      setTimeout(function () { env.className += ' away'; }, reduce ? 0 : 420);
+      setTimeout(function () { openLetter(d, opts); }, reduce ? 0 : 800);
+    });
+    if (opts.preview) previewBar();
+  }
+
+  /* Each word of the letter arrives on its own, in reading order. */
+  function wordsHTML(text) {
+    var out = '', n = 0;
+    String(text == null ? '' : text).split(/(\s+)/).forEach(function (part) {
+      if (!part) return;
+      if (/^\s+$/.test(part)) { out += esc(part); return; }
+      var delay = reduce ? 0 : Math.min(n * 24, 2200);
+      out += '<span class="w" style="animation-delay:' + delay + 'ms">' + esc(part) + '</span>';
+      n++;
+    });
+    return out;
+  }
+
+  /* A few of the envelope's doodles float up behind the letter. */
+  function drift(glyphs) {
+    if (reduce) return;
+    var layer = document.getElementById('drift');
+    if (!layer) { layer = document.createElement('div'); layer.id = 'drift'; document.body.appendChild(layer); }
+    var set = (glyphs && glyphs.length) ? glyphs : ['✦', '✧', '♥'];
+    for (var i = 0; i < 18; i++) {
+      var sp = document.createElement('span');
+      sp.textContent = set[i % set.length];
+      sp.style.left = (Math.random() * 96) + '%';
+      sp.style.fontSize = (16 + Math.random() * 20) + 'px';
+      sp.style.animationDuration = (5.5 + Math.random() * 4) + 's';
+      sp.style.animationDelay = (Math.random() * 2.2) + 's';
+      sp.style.color = ['#F5B931', '#FF5FA2', '#35B6F2', '#2FCF9E', '#FF6B4A', '#9B7BFF'][i % 6];
+      layer.appendChild(sp);
+      (function (el) { setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 12500); })(sp);
+    }
+  }
+
+  function openLetter(d, opts) {
+    opts = opts || {};
+    rain(90);
+    chime([523, 659, 784, 1047]);
+    drift(PATTERNS[d.pattern]);
+    var src = d.shot ? 'data:image/jpeg;base64,' + d.shot : (d.photo || '');
+    var fit = FITS[d.fit] || '4/3';
+    var photo = src
+      ? '<div class="frame' + (d.fit === '3x4' ? ' tall' : '') + '" id="frame" style="--fit:' + fit + '">' +
+        '<img class="photo" src="' + esc(src) + '" alt="A photo from ' + esc(d.from) + '" ' +
+        'decoding="async" onerror="if (this.parentNode) this.parentNode.remove();"></div>'
+      : '';
+    var sheet = SHEETS[d.sheet] ? d.sheet : 'cream';
+    var parts = pages(d.message);
+    var wide = window.matchMedia('(min-width: 860px)').matches;
+
+    document.getElementById('cardStage').innerHTML =
+      '<div class="letter ' + sheet + '" id="letter">' +
+        '<span class="to">To ' + esc(d.to) + '</span>' +
+        '<h1>' + esc(d.headline) + '</h1>' +
+        photo +
+        '<p class="msg" id="msg">' + wordsHTML(parts[0]) + '</p>' +
+        (parts.length > 1
+          ? '<div class="pager" id="pager">' +
+              '<button id="pPrev" disabled aria-label="Previous page">&larr;</button>' +
+              '<span class="dots" id="pDots">1 of ' + parts.length + '</span>' +
+              '<button id="pNext" aria-label="Next page">Turn over &rarr;</button>' +
+            '</div>'
+          : '') +
+        '<span class="sign"><span>&mdash; ' + esc(d.from) + '</span>' +
+          '<svg viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true"><path d="M3 8 C 40 1, 80 12, 120 5 S 180 3, 197 7"/></svg></span>' +
+        songEmbed(d.song, d.start) +
+      '</div>' +
+      '<div class="pills" style="justify-content:center">' +
+        replyHTML(d) +
+        '<button class="btn sun sm" id="more">More confetti</button>' +
+        '<button class="btn ghost sm" id="savePic">Save as a picture</button>' +
+        (wide ? '<button class="btn ghost sm" id="printIt">Print it</button>' : '') +
+        '<button class="btn ghost sm" id="shut">Close it up</button>' +
+        '<button class="btn ghost sm" id="copyIt">Make one like this</button>' +
+      '</div>';
+
+    var letter = $('#letter');
+    [].forEach.call(letter.children, function (el, i) { el.style.setProperty('--i', String(i)); });
+
+    /* Anywhere on the paper is a place to tap. */
+    letter.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('a,button,iframe,.pager,input')) return;
+      burst(e.clientX, e.clientY, 22);
+      chime([988]);
+    });
+
+    var frame = $('#frame');
+    if (frame) {
+      var img = frame.querySelector('.photo');
+      var reveal = function () { frame.classList.add('ready'); };
+      if (img.complete && img.naturalWidth) reveal();
+      else img.addEventListener('load', reveal);
+      /* Nothing stays shimmering for ever on a bad connection. */
+      setTimeout(reveal, 12000);
+      /* The photo leans with the mouse, and straightens up when tapped. */
+      if (window.matchMedia('(hover: hover)').matches && !reduce) {
+        frame.addEventListener('mousemove', function (e) {
+          var r = frame.getBoundingClientRect();
+          var dx = (e.clientX - r.left) / r.width - .5, dy = (e.clientY - r.top) / r.height - .5;
+          frame.style.transition = 'none';
+          frame.style.transform = 'perspective(700px) rotateX(' + (-dy * 9).toFixed(2) + 'deg) rotateY(' + (dx * 11).toFixed(2) + 'deg) rotate(-1.4deg)';
+        });
+        frame.addEventListener('mouseleave', function () { frame.style.transition = ''; frame.style.transform = ''; });
+      }
+      frame.addEventListener('click', function (e) {
+        e.stopPropagation();
+        frame.classList.toggle('straight');
+        chime([1319]);
+      });
+    }
+
+    if (parts.length > 1) {
+      var page = 0;
+      var show = function () {
+        $('#msg').innerHTML = wordsHTML(parts[page]);
+        $('#pDots').textContent = (page + 1) + ' of ' + parts.length;
+        $('#pPrev').disabled = (page === 0);
+        $('#pNext').disabled = (page === parts.length - 1);
+        $('#pNext').innerHTML = (page === parts.length - 1) ? 'The end' : 'Turn over &rarr;';
+      };
+      $('#pPrev').addEventListener('click', function () { if (page > 0) { page--; show(); } });
+      $('#pNext').addEventListener('click', function () {
+        if (page < parts.length - 1) { page++; show(); chime([784]); }
+      });
+    }
+
+    if (d.song && d.song.charAt(0) === 's') {
+      songWanted = { uri: spotifyUri(d.song), token: d.song, start: startSeconds(d.start) };
+      if (spotifyApi) mountSpotify();
+      else {
+        loadSpotifyApi();
+        setTimeout(function () {
+          var box = $('#spotifyBox');
+          if (songWanted && !spotifyApi && box) {
+            songWanted = null;
+            box.innerHTML = spotifyPlainIframe(d.song);
+          }
+        }, 4500);
+      }
+    }
+
+    $('#more').addEventListener('click', function () { rain(120); chime([784, 988]); drift(PATTERNS[d.pattern]); });
+    $('#shut').addEventListener('click', function () { songWanted = null; renderCard(d, opts); });
+    $('#savePic').addEventListener('click', function () { saveImage(d); });
+    if ($('#printIt')) $('#printIt').addEventListener('click', function () { window.print(); });
+    $('#copyIt').addEventListener('click', function () {
+      location.href = location.pathname + '?copy=' + encode({
+        colour: d.colour, pattern: d.pattern, pen: d.pen, sheet: d.sheet, style: d.style
+      });
+    });
+    if (opts.preview) previewBar();
+  }
+
+  function previewBar() {
+    if ($('.previewbar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'previewbar';
+    bar.innerHTML =
+      '<button class="btn ghost sm" id="backEdit">&larr; Back to editing</button>' +
+      '<button class="btn sun sm" id="barCopy">Copy the link</button>';
+    document.body.appendChild(bar);
+    $('#backEdit').addEventListener('click', function () {
+      bar.parentNode.removeChild(bar);
+      songWanted = null;
+      renderMaker();
+      window.scrollTo(0, 0);
+    });
+    $('#barCopy').addEventListener('click', function () { copyLink(draft); });
+  }
+
+  /* ---------------- the card as a picture ---------------- */
+  function loadImage(src) {
+    return new Promise(function (done) {
+      if (!src) { done(null); return; }
+      var i = new Image();
+      i.crossOrigin = 'anonymous';
+      i.onload = function () { done(i); };
+      i.onerror = function () { done(null); };
+      i.src = src;
+      setTimeout(function () { if (!i.complete) done(null); }, 7000);
+    });
+  }
+  function wrapText(x, text, maxW) {
+    var out = [];
+    String(text || '').split('\n').forEach(function (para) {
+      var words = para.split(/\s+/), line = '';
+      if (!para.trim()) { out.push(''); return; }
+      for (var i = 0; i < words.length; i++) {
+        var attempt = line ? line + ' ' + words[i] : words[i];
+        if (x.measureText(attempt).width > maxW && line) { out.push(line); line = words[i]; }
+        else line = attempt;
+      }
+      if (line) out.push(line);
+    });
+    return out;
+  }
+  function saveImage(d) {
+    toast('Drawing the picture...');
+    var penName = PEN_CANVAS[d.pen] || 'Caveat';
+    var fontJobs = [];
+    try {
+      if (document.fonts && document.fonts.load) {
+        fontJobs.push(document.fonts.load('48px "' + penName + '"'));
+        fontJobs.push(document.fonts.load('700 72px "Fredoka"'));
+      }
+    } catch (e) { /* older browser: the fallback face is used */ }
+
+    var src = d.shot ? 'data:image/jpeg;base64,' + d.shot : (d.photo || '');
+    Promise.all([loadImage(src), Promise.all(fontJobs).catch(function () { return null; })])
+      .then(function (res) { paint(d, res[0], penName); });
+  }
+  function paint(d, pic, penName) {
+    var W = 1080, H = 1350, pad = 92;
+    var c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    var x = c.getContext('2d');
+    var ink = SHEET_INK[d.sheet] || SHEET_INK.cream;
+
+    var draw = function (withPic) {
+      x.clearRect(0, 0, W, H);
+      x.fillStyle = ink[0]; x.fillRect(0, 0, W, H);
+
+      /* A hint of the chosen paper, so a saved card still looks like itself. */
+      if (d.sheet === 'ruled') {
+        x.strokeStyle = 'rgba(53,182,242,.3)'; x.lineWidth = 2;
+        for (var ry = 240; ry < H - 120; ry += 58) {
+          x.beginPath(); x.moveTo(pad, ry); x.lineTo(W - pad, ry); x.stroke();
+        }
+      } else if (d.sheet === 'grid') {
+        x.strokeStyle = 'rgba(23,18,15,.07)'; x.lineWidth = 2;
+        for (var gx = 0; gx < W; gx += 46) { x.beginPath(); x.moveTo(gx, 0); x.lineTo(gx, H); x.stroke(); }
+        for (var gy = 0; gy < H; gy += 46) { x.beginPath(); x.moveTo(0, gy); x.lineTo(W, gy); x.stroke(); }
+      } else if (d.sheet === 'stripe') {
+        x.fillStyle = 'rgba(23,18,15,.045)';
+        for (var sx = 0; sx < W; sx += 44) x.fillRect(sx, 0, 20, H);
+      }
+
+      var y = 132;
+      x.textAlign = 'center';
+
+      x.fillStyle = ink[2];
+      x.font = '600 26px "Fredoka", sans-serif';
+      x.fillText(('TO ' + String(d.to || '')).toUpperCase().slice(0, 40), W / 2, y);
+      y += 74;
+
+      if (d.headline) {
+        x.fillStyle = ink[1];
+        x.font = '600 70px "Fredoka", sans-serif';
+        var hl = wrapText(x, d.headline, W - pad * 2);
+        for (var i = 0; i < Math.min(hl.length, 2); i++) { x.fillText(hl[i], W / 2, y); y += 78; }
+        y += 10;
+      }
+
+      if (withPic && pic) {
+        var bw = 520, bh = 390;
+        var scale = Math.max(bw / pic.width, bh / pic.height);
+        var sw = bw / scale, sh = bh / scale;
+        x.save();
+        x.translate(W / 2, y + bh / 2);
+        x.rotate(-0.024);
+        x.shadowColor = 'rgba(23,18,15,.3)'; x.shadowBlur = 26; x.shadowOffsetY = 10;
+        x.fillStyle = '#fff';
+        x.fillRect(-bw / 2 - 10, -bh / 2 - 10, bw + 20, bh + 20);
+        x.shadowColor = 'transparent';
+        x.drawImage(pic, (pic.width - sw) / 2, (pic.height - sh) / 2, sw, sh, -bw / 2, -bh / 2, bw, bh);
+        x.restore();
+        y += bh + 68;
+      }
+
+      x.fillStyle = ink[1];
+      var penPx = Math.round(46 * (PEN_SCALE[d.pen] || 1));
+      x.font = (PEN_STYLE[d.pen] || 'normal') + ' ' + penPx + 'px "' + penName + '", cursive';
+      var body = wrapText(x, d.message, W - pad * 2);
+      var lh = Math.round(penPx * 1.26);
+      var room = Math.floor((H - 190 - y) / lh);
+      for (var j = 0; j < Math.min(body.length, Math.max(room, 1)); j++) {
+        x.fillText(body[j], W / 2, y); y += lh;
+      }
+      if (body.length > room && room > 0) {
+        x.fillStyle = ink[2];
+        x.font = '28px "Fredoka", sans-serif';
+        x.fillText('... the rest is in the card', W / 2, y + 6);
+      }
+
+      x.fillStyle = (d.sheet === 'midnight') ? '#F5B931' : '#FF5FA2';
+      x.font = '700 ' + Math.round(54 * (PEN_SCALE[d.pen] || 1)) + 'px "' + penName + '", cursive';
+      x.fillText('— ' + String(d.from || ''), W / 2, H - 112);
+
+      x.fillStyle = ink[2];
+      x.font = '600 22px "Fredoka", sans-serif';
+      x.fillText('made with Paper Plane', W / 2, H - 48);
+    };
+
+    draw(true);
+    /* A photo from another site can poison the canvas. If it has, the card is
+       drawn again without it rather than failing in front of the user. */
+    var clean = true;
+    try { x.getImageData(0, 0, 1, 1); } catch (e) { clean = false; }
+    if (!clean) { draw(false); }
+
+    var name = ('card-for-' + String(d.to || 'you')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';
+    var finish = function (url, revoke) {
+      var a = document.createElement('a');
+      a.href = url; a.download = name; a.rel = 'noopener';
+      document.body.appendChild(a); a.click();
+      if (a.parentNode) a.parentNode.removeChild(a);
+      if (revoke) setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
+      toast(clean ? 'Picture saved' : 'Picture saved, without the photo');
+    };
+    try {
+      if (c.toBlob) {
+        c.toBlob(function (b) {
+          if (b && window.URL && URL.createObjectURL) finish(URL.createObjectURL(b), true);
+          else finish(c.toDataURL('image/png'), false);
+        }, 'image/png');
+      } else {
+        finish(c.toDataURL('image/png'), false);
+      }
+    } catch (e) {
+      toast('This browser would not save the picture. Try a screenshot instead.');
+    }
+  }
+
+  /* ---------------- cards kept on this device ---------------- */
+  function savedCards() {
+    try {
+      var v = JSON.parse(localStorage.getItem('pp_cards') || '[]');
+      return (v && v.length) ? v : [];
+    } catch (e) { return []; }
+  }
+  function rememberCard(d) {
+    if (!String(d.to || '').trim()) return;
+    var k = encode(d);
+    var list = savedCards().filter(function (r) { return r && r.k !== k; });
+    list.unshift({ k: k, to: String(d.to).slice(0, 28), h: String(d.headline || '').slice(0, 40), w: Date.now() });
+    if (list.length > 12) list.length = 12;
+    try { localStorage.setItem('pp_cards', JSON.stringify(list)); } catch (e) { /* private window */ }
+  }
+  function forgetCard(k) {
+    var list = savedCards().filter(function (r) { return r && r.k !== k; });
+    try { localStorage.setItem('pp_cards', JSON.stringify(list)); } catch (e) { /* private window */ }
+  }
+  function whenWords(ms) {
+    var days = Math.floor((Date.now() - ms) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 30) return days + ' days ago';
+    return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+  function renderSaved() {
+    var box = $('#savedList');
+    if (!box) return;
+    var list = savedCards();
+    if (!list.length) {
+      box.innerHTML = '<p class="hint" style="margin-top:7px">Nothing yet. Cards you copy a link for are kept here, on this device only.</p>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+      html += '<div class="saved-row">' +
+        '<span class="who">' + esc(list[i].to) + (list[i].h ? ' · ' + esc(list[i].h) : '') +
+        ' <span class="when">' + esc(whenWords(list[i].w)) + '</span></span>' +
+        '<button class="pill" data-open="' + i + '">Open</button>' +
+        '<button class="pill" data-drop="' + i + '" aria-label="Forget this card">&times;</button>' +
+        '</div>';
+    }
+    box.innerHTML = html;
+    [].forEach.call(box.querySelectorAll('[data-open]'), function (b) {
+      b.addEventListener('click', function () {
+        var rec = savedCards()[parseInt(b.getAttribute('data-open'), 10)];
+        if (!rec) return;
+        var got = decode(rec.k);
+        if (!got) { toast('That one could not be opened.'); return; }
+        got.shot = '';
+        draft = got;
+        applyPen(draft);
+        renderMaker();
+        window.scrollTo(0, 0);
+        toast('Opened the card for ' + (got.to || 'them'));
+      });
+    });
+    [].forEach.call(box.querySelectorAll('[data-drop]'), function (b) {
+      b.addEventListener('click', function () {
+        var rec = savedCards()[parseInt(b.getAttribute('data-drop'), 10)];
+        if (rec) forgetCard(rec.k);
+        renderSaved();
+      });
+    });
+  }
+
+  /* ---------------- maker ---------------- */
+  var draft = clone(DEFAULT);
+
+  function applyOccasion(o) {
+    var h = String(draft.headline || '').trim().toLowerCase();
+    if (!h || PRESET_HEADS[h]) draft.headline = o.headline;
+    draft.colour = o.colour;
+    draft.pattern = o.pattern;
+    draft.style = o.style;
+    draft.sheet = o.sheet;
+    draft.pen = o.pen;
+    applyPen(draft);
+    renderMaker();
+    window.scrollTo(0, 0);
+    toast(o.name + ' look applied');
+  }
+
+  function renderMaker() {
+    document.getElementById('theme').hidden = false;
+    applyTheme(theme() === 'night');
+    app.innerHTML =
+      '<header class="head">' +
+        '<span class="mark"><span class="dot">&#9993;</span> Paper Plane</span>' +
+        '<h1>Write someone<br>a card worth keeping</h1>' +
+        '<p class="lede">Pick the occasion, write the letter, choose the envelope, the paper and the pen, add a song and a photo. Preview it, then send one link. They open it like real post &mdash; no app, no account.</p>' +
+      '</header>' +
+      '<div class="cols">' +
+        '<section class="panel">' +
+          '<div class="field"><span class="lbl">Occasion</span><div class="pills" id="occ"></div>' +
+            '<span class="hint">Sets the look in one tap. Change anything afterwards.</span></div>' +
+          '<div class="two">' +
+            '<div class="field"><label class="lbl" for="f-to">To</label><input type="text" id="f-to" maxlength="28" placeholder="Her name"></div>' +
+            '<div class="field"><label class="lbl" for="f-from">From</label><input type="text" id="f-from" maxlength="28" placeholder="Your name"></div>' +
+          '</div>' +
+          '<div class="field"><label class="lbl" for="f-head">Big line</label><input type="text" id="f-head" maxlength="40" placeholder="Happy birthday">' +
+            '<span class="hint">The first thing they read. "Happy birthday", "Congratulations", "Thank you".</span></div>' +
+          '<div class="field"><label class="lbl" for="f-front">Writing on the envelope</label>' +
+            '<input type="text" id="f-front" maxlength="28" placeholder="Leave empty for a blank envelope">' +
+            '<span class="hint">A few words on the front, like "Open me" or her name. Empty is fine.</span></div>' +
+          '<div class="field"><label class="lbl" for="f-msg">Your letter</label><textarea id="f-msg" maxlength="2000" placeholder="Write whatever you would write by hand."></textarea>' +
+            '<span class="hint"><span id="count"></span> characters left. <span id="pageNote"></span></span></div>' +
+          '<div class="field"><label class="lbl" for="f-song">Song</label>' +
+            '<input type="text" id="f-song" placeholder="Paste a Spotify or YouTube link">' +
+            '<span class="hint" id="songNote">Starts playing the moment the letter opens. Spotify gives a 30-second taste unless they are signed in to Spotify.</span>' +
+            '<div id="songSwap"></div>' +
+            '<label class="lbl" for="f-start" style="margin-top:6px">Start the song at</label>' +
+            '<input type="text" id="f-start" maxlength="7" placeholder="1:04 or 64">' +
+            '<span class="hint" id="startNote">Skips to the good part. Leave empty to start from the beginning.</span></div>' +
+          '<div class="field"><label class="lbl" for="f-reply">Reply to</label>' +
+            '<input type="text" id="f-reply" maxlength="60" placeholder="233241234567 or you@email.com">' +
+            '<span class="hint" id="replyNote">Adds a "Say thank you" button. A phone number needs its country code, no + or spaces.</span></div>' +
+          '<div class="field"><span class="lbl">Photo</span>' +
+            '<div class="pills"><button class="pill" id="pick">Choose a photo</button>' +
+            '<button class="pill" id="adjustPic" hidden>Adjust it</button>' +
+            '<button class="pill" id="dropPic" hidden>Remove</button></div>' +
+            '<input type="file" id="file" accept="image/*" hidden>' +
+            '<span class="hint" id="picNote">Choose a photo, then pick the part of it the card should show.</span>' +
+            '<div id="picEdit"></div>' +
+            '<div id="picPrev"></div>' +
+            '<details style="margin-top:4px" id="keyBox"><summary class="hint" style="cursor:pointer">Photo upload setup</summary>' +
+            '<p class="hint" style="margin-top:7px">Photos need somewhere to live. Make a free account at <b>imgbb.com</b>, open <b>About &rarr; API</b>, ' +
+            'copy your API key and paste it here once. It is saved in this browser only, never in the cards you send.</p>' +
+            '<input type="text" id="f-key" maxlength="60" placeholder="ImgBB API key" style="margin-top:7px">' +
+            '<span class="hint" id="keyNote"></span>' +
+            '<p class="hint" style="margin-top:9px">No key? A photo still works &mdash; it travels inside the link, which makes the link very long. ' +
+            'Or upload the picture to this site\'s repository and name it here:</p>' +
+            '<input type="text" id="f-pic" maxlength="60" placeholder="photo.jpg" style="margin-top:7px">' +
+            '</details></div>' +
+        '</section>' +
+        '<section class="panel stick">' +
+          '<div class="stage">' +
+            '<span class="eyebrow">Live preview</span>' +
+            '<div id="prev"></div>' +
+            '<span class="hint">Tap the envelope to peek inside</span>' +
+          '</div>' +
+          '<div class="field"><span class="lbl">Envelope</span><div class="pills" id="style"></div></div>' +
+          '<div class="field"><span class="lbl">Envelope colour</span><div class="swatches" id="sw"></div>' +
+            '<span class="hint" id="colourNote"></span></div>' +
+          '<div class="field"><span class="lbl">Doodles</span><div class="pills" id="pat"></div></div>' +
+          '<div class="field"><span class="lbl">Paper</span><div class="pills" id="sheet"></div></div>' +
+          '<div class="field"><span class="lbl">Handwriting</span><div class="pills" id="pen"></div></div>' +
+          '<div class="field"><span class="lbl">Paper and pen together</span><div id="penPrev"></div></div>' +
+          '<button class="btn sun wide" id="preview">Preview the card &#10022;</button>' +
+          '<button class="btn ghost sm" id="make">Just copy the link</button>' +
+          '<details id="savedBox"><summary class="hint" style="cursor:pointer">Cards you have made</summary>' +
+            '<div id="savedList"></div></details>' +
+          '<details id="linkSetup"><summary class="hint" style="cursor:pointer">Short link settings</summary>' +
+            '<p class="hint" style="margin-top:7px">Links are shortened automatically with is.gd, free and with nothing to set up. ' +
+            'Add a Linkly key as well and your links are tracked, so you can see who opened a card. ' +
+            'Linkly\'s free plan allows 100 links; after that this quietly goes back to is.gd.</p>' +
+            '<input type="text" id="f-lkey" maxlength="80" placeholder="Linkly API key" style="margin-top:7px">' +
+            '<input type="text" id="f-lws" maxlength="20" placeholder="Workspace ID, e.g. 416910" style="margin-top:7px">' +
+            '<span class="hint" id="lkeyNote"></span>' +
+            '<p class="hint" style="margin-top:7px">Saved in this browser only, never written into the site. ' +
+            'The key can also list and delete links on your account, so treat it like a password.</p>' +
+            '</details>' +
+          '<div class="field linkbox" id="linkField" hidden><span class="lbl">Your link</span>' +
+            '<textarea id="linkbox" readonly rows="3"></textarea>' +
+            '<a class="btn sun sm" id="waLink" target="_blank" rel="noopener" href="#">Send it on WhatsApp</a>' +
+            '<a class="btn ghost sm" id="openLink" target="_blank" rel="noopener" href="#">Open the link in a new tab</a>' +
+            '<span class="hint" id="linkNote"></span></div>' +
+        '</section>' +
+      '</div>';
+
+    $('#f-to').value = draft.to;
+    $('#f-from').value = draft.from;
+    $('#f-head').value = draft.headline;
+    $('#f-front').value = draft.front || '';
+    $('#f-msg').value = draft.message;
+    bind('f-to', 'to'); bind('f-from', 'from'); bind('f-head', 'headline');
+    bind('f-front', 'front'); bind('f-msg', 'message');
+    count();
+
+    var occ = $('#occ');
+    OCCASIONS.forEach(function (o) {
+      var b = document.createElement('button');
+      b.className = 'pill';
+      b.textContent = o.name;
+      b.addEventListener('click', function () { applyOccasion(o); });
+      occ.appendChild(b);
+    });
+
+    choices('#style', Object.keys(STYLES), function (k) { return STYLES[k]; },
+      function () { return draft.style; },
+      function (k) { draft.style = k; colourNote(); preview(); });
+
+    var sw = $('#sw');
+    COLOURS.forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'sw'; b.style.background = c.hex; b.title = c.name;
+      b.setAttribute('aria-label', c.name);
+      b.setAttribute('aria-pressed', String(draft.colour === c.id));
+      b.addEventListener('click', function () {
+        draft.colour = c.id;
+        document.documentElement.style.setProperty('--accent', c.hex);
+        [].forEach.call(sw.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        preview();
+      });
+      sw.appendChild(b);
+    });
+    document.documentElement.style.setProperty('--accent', hex(draft.colour));
+    colourNote();
+
+    choices('#pat', Object.keys(PATTERNS), function (k) { return PATTERN_NAMES[k]; },
+      function () { return draft.pattern; },
+      function (k) { draft.pattern = k; preview(); });
+
+    choices('#sheet', Object.keys(SHEETS), function (k) {
+        return '<span class="chip ' + k + '"></span>' + SHEETS[k];
+      },
+      function () { return draft.sheet; },
+      function (k) { draft.sheet = k; penPreview(); }, true);
+
+    choices('#pen', Object.keys(PENS), function (k) { return PEN_NAMES[k]; },
+      function () { return draft.pen; },
+      function (k) { draft.pen = k; applyPen(draft); penPreview(); preview(); });
+    /* Each pen writes its own name. */
+    [].forEach.call($('#pen').children, function (b) {
+      var k = b.getAttribute('data-key');
+      b.className = 'pill pen';
+      if (PENS[k]) {
+        b.style.fontFamily = PENS[k];
+        b.style.fontSize = (1.12 * (PEN_SCALE[k] || 1)) + 'rem';
+        b.style.fontStyle = PEN_STYLE[k] || 'normal';
+      }
+    });
+    penPreview();
+
+    var songIn = $('#f-song');
+    songIn.value = songUrl(draft.song);
+    songIn.addEventListener('input', function () {
+      var raw = songIn.value.trim();
+      draft.song = songToken(raw);
+      startNote();
+      songNote(raw);
+    });
+    songNote(songIn.value.trim());
+
+    var startIn = $('#f-start');
+    startIn.value = draft.start || '';
+    startIn.addEventListener('input', function () {
+      draft.start = startIn.value.trim();
+      startNote();
+    });
+    startNote();
+
+    var replyIn = $('#f-reply');
+    replyIn.value = draft.reply || '';
+    replyIn.addEventListener('input', function () {
+      draft.reply = replyIn.value.trim();
+      $('#replyNote').textContent = !draft.reply
+        ? 'Adds a "Say thank you" button. A phone number needs its country code, no + or spaces.'
+        : (replyHref(draft.reply) ? 'The letter will have a "Say thank you" button.'
+                                  : 'Needs an email address or a full phone number.');
+    });
+
+    var picIn = $('#f-pic');
+    picIn.value = draft.photo || '';
+    picIn.addEventListener('input', function () { draft.photo = picIn.value.trim(); picPreview(); });
+    var keyIn = $('#f-key');
+    keyIn.value = photoKey();
+    keyIn.addEventListener('input', function () {
+      setPhotoKey(keyIn.value.trim());
+      keyNote();
+    });
+    keyNote();
+
+    $('#pick').addEventListener('click', function () { $('#file').click(); });
+    $('#file').addEventListener('change', function (e) { if (e.target.files[0]) choosePhoto(e.target.files[0]); });
+    $('#adjustPic').addEventListener('click', function () {
+      if (pic) { pic.open = true; renderPicEditor(); picPreview(); }
+      else if (picSrc) loadForEdit(picSrc);
+    });
+    $('#dropPic').addEventListener('click', function () {
+      draft.shot = '';
+      draft.photo = '';
+      draft.fit = '';
+      pic = null;
+      picSrc = '';
+      if ($('#f-pic')) $('#f-pic').value = '';
+      $('#file').value = '';
+      $('#picNote').textContent = 'Choose a photo, then pick the part of it the card should show.';
+      renderPicEditor();
+      picPreview();
+    });
+
+    var lkey = $('#f-lkey'), lws = $('#f-lws');
+    lkey.value = linkly().key;
+    lws.value = linkly().ws;
+    var saveLinkly = function () {
+      setLinkly(lkey.value.trim(), lws.value.trim());
+      lkeyNote();
+    };
+    lkey.addEventListener('input', saveLinkly);
+    lws.addEventListener('input', saveLinkly);
+    lkeyNote();
+
+    $('#preview').addEventListener('click', function () {
+      if (!ready()) return;
+      renderCard(clone(draft), { preview: true });
+      window.scrollTo(0, 0);
+      toast('This is exactly what they will see');
+    });
+    $('#make').addEventListener('click', function () { if (ready()) copyLink(draft); });
+
+    renderSaved();
+    renderPicEditor();
+    picPreview();
+    preview();
+    ensureAllPens();
+  }
+
+  /* Says plainly what each kind of link can and cannot do, and offers the way
+     across when it matters. */
+  function songNote(raw) {
+    var n = $('#songNote'), swap = $('#songSwap');
+    if (!n) return;
+    if (swap) swap.innerHTML = '';
+    if (!raw) {
+      n.textContent = 'Starts playing the moment the letter opens. Spotify gives a 30-second taste unless they are signed in to Spotify.';
+      return;
+    }
+    if (!draft.song) {
+      n.textContent = 'That is not a Spotify or YouTube link yet.';
+      return;
+    }
+    if (draft.song.charAt(0) === 'y') {
+      n.textContent = 'YouTube track found. It starts on its own when the letter opens.';
+      return;
+    }
+    n.textContent = 'Spotify track found. It is told to start when the letter opens. Not signed in to Spotify, they hear a 30-second taste; signed in, the whole song.';
+    spotifyTitle(draft.song).then(function (title) {
+      if (!swap || !title || draft.song.charAt(0) !== 's') return;
+      swap.innerHTML = '<a class="btn ghost sm" target="_blank" rel="noopener" style="margin-top:7px" href="' +
+        'https://www.youtube.com/results?search_query=' + encodeURIComponent(title) + '">' +
+        'Prefer the full song for everyone? Find "' + esc(title.slice(0, 32)) + '" on YouTube</a>';
+    });
+  }
+
+  /* Spotify's oEmbed tells us the track name without an account or a key. */
+  function spotifyTitle(token) {
+    var path = token.slice(2);
+    var stop = new AbortController();
+    var timer = setTimeout(function () { stop.abort(); }, 5000);
+    return fetch('https://open.spotify.com/oembed?url=' +
+        encodeURIComponent('https://open.spotify.com/' + path), { signal: stop.signal })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { clearTimeout(timer); return (j && j.title) ? String(j.title) : ''; })
+      .catch(function () { clearTimeout(timer); return ''; });
+  }
+
+  function startNote() {
+    var n = $('#startNote');
+    if (!n) return;
+    var secs = startSeconds(draft.start);
+    if (!draft.start) {
+      n.textContent = 'Skips to the good part. Leave empty to start from the beginning.';
+    } else if (!secs) {
+      n.textContent = 'Write it as 1:04, or as a number of seconds.';
+    } else if (draft.song && draft.song.charAt(0) === 's') {
+      var m2 = Math.floor(secs / 60), s2 = secs % 60;
+      n.textContent = 'Spotify is asked to skip to ' + m2 + ':' + (s2 < 10 ? '0' : '') + s2 + ' once it starts. That only works for the whole song, so for listeners signed in to Spotify.';
+    } else {
+      var mm = Math.floor(secs / 60), ss = secs % 60;
+      n.textContent = 'Starts at ' + mm + ':' + (ss < 10 ? '0' : '') + ss + '.';
+    }
+  }
+
+  /* A card with no name and no words is not a card yet. */
+  function ready() {
+    if (!String(draft.to || '').trim()) { toast('Who is it for? Fill in "To" first.'); $('#f-to').focus(); return false; }
+    if (!String(draft.message || '').trim() && !String(draft.headline || '').trim()) {
+      toast('Write a line or two first.'); $('#f-msg').focus(); return false;
+    }
+    if (!String(draft.from || '').trim()) { toast('Add your name in "From".'); $('#f-from').focus(); return false; }
+    return true;
+  }
+
+  function colourNote() {
+    var n = $('#colourNote');
+    if (!n) return;
+    n.textContent = FIXED_COLOUR[draft.style]
+      ? 'The ' + STYLES[draft.style] + ' envelope has its own paper, so the colour is used elsewhere on the card.'
+      : '';
+  }
+
+  function choices(sel, keys, label, current, pick, asHtml) {
+    var box = $(sel);
+    if (!box) return;
+    box.innerHTML = '';
+    keys.forEach(function (k) {
+      var b = document.createElement('button');
+      b.className = 'pill';
+      if (asHtml) b.innerHTML = label(k); else b.textContent = label(k);
+      b.setAttribute('data-key', k);
+      b.setAttribute('aria-pressed', String(current() === k));
+      b.addEventListener('click', function () {
+        pick(k);
+        [].forEach.call(box.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function bind(id, key) {
+    var el = document.getElementById(id);
+    el.addEventListener('input', function () {
+      draft[key] = el.value;
+      count();
+      preview();
+      if (key === 'headline' || key === 'message') penPreview();
+    });
+  }
+  function count() {
+    var c = $('#count');
+    if (!c) return;
+    var left = 2000 - (draft.message || '').length;
+    c.textContent = String(left);
+    /* A warning only near the end, so the number is not a nag while writing. */
+    c.style.color = left < 150 ? 'var(--coral)' : '';
+    var p = $('#pageNote');
+    if (p) {
+      var n = pages(draft.message).length;
+      p.textContent = n > 1 ? 'Long enough to turn over: ' + n + ' pages.' : '';
+    }
+  }
+
+  function penPreview() {
+    var box = $('#penPrev');
+    if (!box) return;
+    var sheet = SHEETS[draft.sheet] ? draft.sheet : 'cream';
+    var id = PENS[draft.pen] ? draft.pen : 'caveat';
+    var penCss = 'font-family:' + PENS[id] + ';font-style:' + (PEN_STYLE[id] || 'normal');
+    var sc = PEN_SCALE[id] || 1;
+    var line = (draft.message || 'Your letter will look like this.').split('\n')[0].slice(0, 60);
+    box.innerHTML = '<div class="letter sample ' + sheet + '" style="animation:none;box-shadow:none;max-width:none">' +
+      '<span class="big" style="' + penCss + ';font-size:' + (1.5 * sc) + 'rem">' + esc(draft.headline || 'Your big line') + '</span>' +
+      '<span class="small" style="' + penCss + ';font-size:' + (1.05 * sc) + 'rem">' + esc(line) + '</span>' +
+      '</div>';
+  }
+
+  /* The upload key lives in this browser only. */
+  function photoKey() {
+    try { return localStorage.getItem('pp_key') || ''; } catch (e) { return ''; }
+  }
+  function setPhotoKey(v) {
+    try { v ? localStorage.setItem('pp_key', v) : localStorage.removeItem('pp_key'); } catch (e) { /* private window */ }
+  }
+  function keyNote() {
+    var n = $('#keyNote');
+    if (!n) return;
+    n.textContent = photoKey() ? 'Key saved in this browser. Photos will upload and the link stays short.'
+                               : 'Without a key, photos ride inside the link.';
+  }
+
+  /* Sends the shrunk photo to the host and returns its address. */
+  function uploadPhoto(base64) {
+    var key = photoKey();
+    if (!key) return Promise.resolve('');
+    var form = new FormData();
+    form.append('image', base64);
+    return fetch('https://api.imgbb.com/1/upload?key=' + encodeURIComponent(key), { method: 'POST', body: form })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j && j.success && j.data && j.data.url) return j.data.url;
+        throw new Error((j && j.error && j.error.message) || 'upload refused');
+      });
+  }
+
+  /* ---------------- choosing the part of a photo ---------------- */
+  /* The whole photo is shown, dimmed, with a bright window over the part the
+     card will use. Drag the window to move it, drag a corner or use the
+     slider to change its size, and a small copy beside it shows exactly what
+     the letter will show. The crop is cut before anything is uploaded, so
+     only the shape travels in the link. */
+  var SHAPES = { '4x3': [480, 360], '1x1': [430, 430], '3x4': [360, 480] };
+  var SHAPE_NAMES = { '4x3': 'Landscape', '1x1': 'Square', '3x4': 'Portrait' };
+  var pic = null;    /* what is being chosen right now */
+  var picSrc = '';   /* the untouched original, so it can be chosen again */
+
+  function choosePhoto(file) {
+    var r = new FileReader();
+    $('#picNote').textContent = 'Opening the photo...';
+    r.onload = function () { loadForEdit(r.result); };
+    r.onerror = function () { $('#picNote').textContent = 'Could not read that file.'; };
+    r.readAsDataURL(file);
+  }
+
+  function loadForEdit(src) {
+    var img = new Image();
+    img.onload = function () {
+      picSrc = src;
+      pic = { img: img, rot: 0, shape: SHAPES[draft.fit] ? draft.fit : '4x3', open: true, k: 1, box: null, work: null };
+      rebuildWork();
+      fitBox(1);
+      $('#picNote').textContent = 'Move the bright window over the part you want.';
+      renderPicEditor();
+      picPreview();
+    };
+    img.onerror = function () { $('#picNote').textContent = 'That file would not open as a picture.'; };
+    img.src = src;
+  }
+
+  /* The photo, turned the way the sender wants it, on a canvas of its own,
+     so every measurement after this is taken from an upright picture. */
+  function rebuildWork() {
+    var img = pic.img, turned = (pic.rot % 180) !== 0;
+    var w = turned ? img.height : img.width, h = turned ? img.width : img.height;
+    var s = Math.min(1, 1600 / Math.max(w, h));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * s));
+    c.height = Math.max(1, Math.round(h * s));
+    var g = c.getContext('2d');
+    g.translate(c.width / 2, c.height / 2);
+    g.rotate(pic.rot * Math.PI / 180);
+    g.drawImage(img, -img.width * s / 2, -img.height * s / 2, img.width * s, img.height * s);
+    pic.work = c;
+  }
+  function shapeRatio() { var d = SHAPES[pic.shape] || SHAPES['4x3']; return d[0] / d[1]; }
+  function maxBoxWidth() {
+    var W = pic.work.width, H = pic.work.height, r = shapeRatio();
+    return Math.min(W, H * r);
+  }
+  /* The window at k times its largest possible size, centred where asked. */
+  function fitBox(k, cx, cy) {
+    var W = pic.work.width, H = pic.work.height, r = shapeRatio();
+    k = Math.max(.2, Math.min(1, k));
+    var w = maxBoxWidth() * k, h = w / r;
+    if (cx == null) { cx = pic.box ? pic.box.x + pic.box.w / 2 : W / 2; }
+    if (cy == null) { cy = pic.box ? pic.box.y + pic.box.h / 2 : H / 2; }
+    pic.box = { w: w, h: h, x: cx - w / 2, y: cy - h / 2 };
+    pic.k = k;
+    clampBox();
+  }
+  function clampBox() {
+    var b = pic.box, W = pic.work.width, H = pic.work.height;
+    if (b.x < 0) b.x = 0;
+    if (b.y < 0) b.y = 0;
+    if (b.x + b.w > W) b.x = W - b.w;
+    if (b.y + b.h > H) b.y = H - b.h;
+  }
+
+  function drawChooser(canvas) {
+    var W = pic.work.width, H = pic.work.height;
+    var s = Math.min(1, 720 / Math.max(W, H));
+    var cw = Math.round(W * s), ch = Math.round(H * s);
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    pic.view = s;
+    var g = canvas.getContext('2d'), b = pic.box;
+    g.clearRect(0, 0, cw, ch);
+    g.drawImage(pic.work, 0, 0, cw, ch);
+    g.fillStyle = 'rgba(12,10,8,.6)';
+    g.fillRect(0, 0, cw, ch);
+    g.drawImage(pic.work, b.x, b.y, b.w, b.h, b.x * s, b.y * s, b.w * s, b.h * s);
+    var px = canvas.width / (canvas.clientWidth || canvas.width);
+    g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 2 * px;
+    g.strokeRect(b.x * s + px, b.y * s + px, b.w * s - 2 * px, b.h * s - 2 * px);
+    g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = px;
+    for (var i = 1; i < 3; i++) {
+      g.beginPath(); g.moveTo((b.x + b.w * i / 3) * s, b.y * s); g.lineTo((b.x + b.w * i / 3) * s, (b.y + b.h) * s); g.stroke();
+      g.beginPath(); g.moveTo(b.x * s, (b.y + b.h * i / 3) * s); g.lineTo((b.x + b.w) * s, (b.y + b.h * i / 3) * s); g.stroke();
+    }
+    /* Corner grips. */
+    var hs = 7 * px;
+    g.fillStyle = '#fff';
+    [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].forEach(function (c) {
+      g.beginPath(); g.arc(c[0] * s, c[1] * s, hs, 0, Math.PI * 2); g.fill();
+    });
+  }
+  function drawResult(canvas) {
+    var dim = SHAPES[pic.shape] || SHAPES['4x3'];
+    var w = 208, h = Math.round(w * dim[1] / dim[0]);
+    canvas.width = w; canvas.height = h;
+    var b = pic.box;
+    canvas.getContext('2d').drawImage(pic.work, b.x, b.y, b.w, b.h, 0, 0, w, h);
+  }
+  function bakePhoto() {
+    var dim = SHAPES[pic.shape] || SHAPES['4x3'];
+    var c = document.createElement('canvas');
+    c.width = dim[0]; c.height = dim[1];
+    var b = pic.box;
+    c.getContext('2d').drawImage(pic.work, b.x, b.y, b.w, b.h, 0, 0, dim[0], dim[1]);
+    var q = [0.68, 0.6, 0.5, 0.42, 0.35, 0.28, 0.22], url = '';
+    for (var i = 0; i < q.length; i++) {
+      url = c.toDataURL('image/jpeg', q[i]);
+      if (url.length < 40000) break;
+    }
+    return url.split(',')[1] || '';
+  }
+
+  function renderPicEditor() {
+    var box = $('#picEdit');
+    if (!box) return;
+    if (!pic || !pic.open) { box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<div class="picedit">' +
+        '<div class="row">' +
+          '<canvas class="chooser" id="picCanvas" aria-label="Choose the part of the photo to show"></canvas>' +
+          '<div><canvas class="result" id="picResult"></canvas><span class="result-cap">On the card</span></div>' +
+        '</div>' +
+        '<span class="hint">Drag the bright window to move it. Drag a corner, or use the slider, to change its size.</span>' +
+        '<div class="pills" id="picShape"></div>' +
+        '<label class="hint" for="picSize">Window size</label>' +
+        '<input type="range" id="picSize" min="0.2" max="1" step="0.01" value="' + pic.k + '">' +
+        '<div class="pills">' +
+          '<button class="pill" id="rotL">Turn left</button>' +
+          '<button class="pill" id="rotR">Turn right</button>' +
+          '<button class="pill" id="picReset">Start again</button>' +
+        '</div>' +
+        '<div class="pills" style="margin-top:2px">' +
+          '<button class="btn sun sm" id="picUse">Use this photo</button>' +
+          '<button class="btn ghost sm" id="picCancel">Cancel</button>' +
+        '</div>' +
+      '</div>';
+
+    var canvas = $('#picCanvas'), result = $('#picResult'), slider = $('#picSize');
+    var redraw = function () { drawChooser(canvas); drawResult(result); };
+    redraw();
+
+    var shapeBox = $('#picShape');
+    Object.keys(SHAPES).forEach(function (k) {
+      var b = document.createElement('button');
+      b.className = 'pill';
+      b.textContent = SHAPE_NAMES[k];
+      b.setAttribute('data-shape', k);
+      b.setAttribute('aria-pressed', String(pic.shape === k));
+      b.addEventListener('click', function () {
+        pic.shape = k;
+        fitBox(pic.k);
+        renderPicEditor();
+      });
+      shapeBox.appendChild(b);
+    });
+
+    slider.addEventListener('input', function (e) {
+      fitBox(parseFloat(e.target.value) || 1);
+      redraw();
+    });
+    var turn = function (deg) {
+      pic.rot = (pic.rot + deg) % 360;
+      rebuildWork();
+      pic.box = null;
+      fitBox(1);
+      slider.value = '1';
+      redraw();
+    };
+    $('#rotL').addEventListener('click', function () { turn(270); });
+    $('#rotR').addEventListener('click', function () { turn(90); });
+    $('#picReset').addEventListener('click', function () { pic.rot = 0; rebuildWork(); pic.box = null; fitBox(1); slider.value = '1'; redraw(); });
+
+    /* Dragging, with a finger or a mouse. */
+    var mode = '', lastX = 0, lastY = 0, anchor = null;
+    var toWork = function (e) {
+      var r = canvas.getBoundingClientRect();
+      var k = (canvas.width / (r.width || canvas.width)) / pic.view;
+      return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, k: k };
+    };
+    canvas.addEventListener('pointerdown', function (e) {
+      var p = toWork(e), b = pic.box;
+      var grab = 22 * p.k;
+      var corners = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]];
+      mode = 'move'; anchor = null;
+      for (var i = 0; i < 4; i++) {
+        if (Math.abs(p.x - corners[i][0]) < grab && Math.abs(p.y - corners[i][1]) < grab) {
+          mode = 'size';
+          anchor = corners[3 - i];
+          break;
+        }
+      }
+      if (mode === 'move' && (p.x < b.x || p.x > b.x + b.w || p.y < b.y || p.y > b.y + b.h)) {
+        /* A tap outside the window brings the window there. */
+        b.x = p.x - b.w / 2; b.y = p.y - b.h / 2; clampBox(); redraw();
+      }
+      lastX = p.x; lastY = p.y;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* older browser */ }
+      e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (!mode) return;
+      var p = toWork(e), b = pic.box;
+      if (mode === 'move') {
+        b.x += p.x - lastX; b.y += p.y - lastY;
+        clampBox();
+      } else {
+        var r = shapeRatio();
+        var dx = Math.abs(p.x - anchor[0]), dy = Math.abs(p.y - anchor[1]);
+        var w = Math.max(dx, dy * r);
+        var roomX = (p.x >= anchor[0]) ? (pic.work.width - anchor[0]) : anchor[0];
+        var roomY = (p.y >= anchor[1]) ? (pic.work.height - anchor[1]) : anchor[1];
+        w = Math.min(w, roomX, roomY * r);
+        w = Math.max(w, maxBoxWidth() * .2);
+        var h = w / r;
+        b.w = w; b.h = h;
+        b.x = (p.x >= anchor[0]) ? anchor[0] : anchor[0] - w;
+        b.y = (p.y >= anchor[1]) ? anchor[1] : anchor[1] - h;
+        clampBox();
+        pic.k = w / maxBoxWidth();
+        slider.value = String(Math.round(pic.k * 100) / 100);
+      }
+      lastX = p.x; lastY = p.y;
+      redraw();
+      e.preventDefault();
+    });
+    var letGo = function () { mode = ''; };
+    canvas.addEventListener('pointerup', letGo);
+    canvas.addEventListener('pointercancel', letGo);
+
+    $('#picUse').addEventListener('click', function () {
+      var body = bakePhoto();
+      pic.open = false;
+      renderPicEditor();
+      if (!body) {
+        $('#picNote').textContent = 'That photo could not be saved. Try another one.';
+        return;
+      }
+      finishPhoto(body);
+    });
+    $('#picCancel').addEventListener('click', function () {
+      pic.open = false;
+      renderPicEditor();
+      picPreview();
+      $('#picNote').textContent = (draft.shot || draft.photo)
+        ? 'Kept the photo you had.'
+        : 'Choose a photo, then pick the part of it the card should show.';
+    });
+  }
+
+  /* Uploads the framed photo, or tucks it inside the link when there is no key. */
+  function finishPhoto(body) {
+    draft.fit = pic ? pic.shape : '4x3';
+    if ($('#f-pic')) $('#f-pic').value = '';
+    if (photoKey()) {
+      draft.shot = body;
+      picPreview();
+      $('#picNote').textContent = 'Uploading the photo...';
+      uploadPhoto(body).then(function (link) {
+        draft.photo = link;
+        draft.shot = '';
+        picPreview();
+        $('#picNote').textContent = 'Photo uploaded. The link stays short.';
+        toast('Photo uploaded');
+      }, function (err) {
+        draft.photo = '';
+        $('#picNote').textContent = 'Upload failed (' + (err && err.message ? err.message : 'no answer') +
+          '). The photo will ride inside the link instead, making it long.';
+        picPreview();
+      });
+    } else {
+      draft.shot = body;
+      draft.photo = '';
+      $('#picNote').textContent = 'Photo ready, about ' + Math.round(body.length / 1024) +
+        ' KB inside the link. Add an upload key for a short link.';
+      picPreview();
+      toast('Photo added');
+    }
+  }
+
+  function picPreview() {
+    var box = $('#picPrev');
+    if (!box) return;
+    var has = !!(draft.shot || draft.photo);
+    var editing = !!(pic && pic.open);
+    var drop = $('#dropPic');
+    if (drop) drop.hidden = !has || editing;
+    var adj = $('#adjustPic');
+    if (adj) adj.hidden = !picSrc || !has || editing;
+    if (editing) { box.innerHTML = ''; return; }
+    var wide = draft.fit === '3x4' ? '70px' : (draft.fit === '1x1' ? '92px' : '120px');
+    var style = 'margin-top:8px;width:' + wide + ';height:92px;object-fit:cover;border-radius:12px;border:1.5px solid var(--line)';
+    if (draft.shot) {
+      box.innerHTML = '<img id="shotPrev" src="data:image/jpeg;base64,' + draft.shot + '" alt="Chosen photo" style="' + style + '">';
+      return;
+    }
+    if (!draft.photo) { box.innerHTML = ''; return; }
+    /* The thumbnail stays put when a picture will not load; only a note
+       appears, and the note depends on where the picture was meant to come
+       from. Wired up here rather than inline, because a picture can still be
+       loading when this panel is redrawn, and by then it has no neighbour
+       left to speak to. */
+    var web = /^https?:/i.test(draft.photo);
+    box.innerHTML = '';
+    var shot = document.createElement('img');
+    shot.alt = 'Chosen photo';
+    shot.setAttribute('style', style);
+    var note = document.createElement('span');
+    note.className = 'hint';
+    note.hidden = true;
+    note.textContent = web ? 'The uploaded photo is not loading. Try choosing it again.'
+                           : 'No file by that name on the site yet.';
+    shot.addEventListener('error', function () {
+      shot.style.display = 'none';
+      if (note.parentNode) note.hidden = false;
+    });
+    shot.src = draft.photo;
+    box.appendChild(shot);
+    box.appendChild(note);
+  }
+
+  function preview() {
+    var p = $('#prev');
+    if (!p) return;
+    p.innerHTML = envelopeHTML(draft, false);
+    var e = document.getElementById('env');
+    e.addEventListener('click', function () {
+      e.className = e.className.indexOf(' open') > -1
+        ? e.className.replace(' open', '') : e.className + ' open';
+    });
+  }
+
+  function linkly() {
+    try {
+      return { key: localStorage.getItem('pp_lkey') || '', ws: localStorage.getItem('pp_lws') || '' };
+    } catch (e) { return { key: '', ws: '' }; }
+  }
+  function setLinkly(key, ws) {
+    try {
+      key ? localStorage.setItem('pp_lkey', key) : localStorage.removeItem('pp_lkey');
+      ws ? localStorage.setItem('pp_lws', ws) : localStorage.removeItem('pp_lws');
+    } catch (e) { /* private window */ }
+  }
+  function lkeyNote() {
+    var n = $('#lkeyNote');
+    if (!n) return;
+    var l = linkly();
+    n.textContent = (l.key && l.ws) ? 'Linkly will be tried first, so your links are tracked.'
+      : (l.key || l.ws) ? 'Both the key and the workspace ID are needed.'
+      : 'Using is.gd. Untracked, unlimited, nothing to set up.';
+  }
+
+  /* Asks Linkly for a tracked short link. The body is form-encoded on purpose:
+     it avoids the browser's preflight request, which Linkly may not answer. */
+  function shortenLinkly(url) {
+    var l = linkly();
+    if (!l.key || !l.ws) return Promise.resolve('');
+    var stop = new AbortController();
+    var timer = setTimeout(function () { stop.abort(); }, 7000);
+    var body = 'api_key=' + encodeURIComponent(l.key) +
+      '&workspace_id=' + encodeURIComponent(l.ws) +
+      '&url=' + encodeURIComponent(url);
+    return fetch('https://api.linklyhq.com/api/v1/link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body,
+      signal: stop.signal
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        clearTimeout(timer);
+        /* Their "url" field is the destination, not the short link, so only
+           these two are trusted. */
+        var short = j && (j.full_url || j.short_url);
+        return (typeof short === 'string' && /^https?:\/\//.test(short)) ? short : '';
+      })
+      .catch(function () { clearTimeout(timer); return ''; });
+  }
+
+  /* Asks is.gd for a tidy link. No account, no key. Gives up quickly and
+     quietly: a long link that works beats a short one that never arrives. */
+  function shorten(url) {
+    /* Shorteners refuse very long addresses, so a photo-carrying link is not
+       even offered to them. */
+    if (url.length > 4500) return Promise.resolve('');
+    var stop = new AbortController();
+    var timer = setTimeout(function () { stop.abort(); }, 6000);
+    return fetch('https://is.gd/create.php?format=simple&url=' + encodeURIComponent(url), { signal: stop.signal })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (t) {
+        clearTimeout(timer);
+        t = String(t || '').trim();
+        return /^https:\/\/is\.gd\/[A-Za-z0-9]+$/.test(t) ? t : '';
+      })
+      .catch(function () { clearTimeout(timer); return ''; });
+  }
+
+  /* One place that builds, shows and copies the link, so the box always holds
+     exactly what the clipboard holds. */
+  function copyLink(d) {
+    var url = cardUrl(d);
+    rememberCard(d);
+    renderSaved();
+    showLink(d, url, url.length > 4500
+      ? 'A photo inside the link makes it too long to shorten. Upload the photo instead for a short link.'
+      : 'Shortening the link...');
+    copyToClipboard(url, d);
+
+    if (url.length > 4500) return url;
+
+    shortenLinkly(url).then(function (tracked) {
+      return tracked || shorten(url);
+    }).then(function (short) {
+      if (!short) {
+        showLink(d, url, url.length.toLocaleString() + ' characters. The shortener did not answer, so this is the full link, which works just the same.');
+        return;
+      }
+      showLink(d, short, 'Shortened. The full link still works if you kept it.');
+      copyToClipboard(short, d, true);
+    });
+    return url;
+  }
+
+  /* Puts one address everywhere at once: the box, the WhatsApp button and the
+     test link can never disagree. */
+  function showLink(d, url, note) {
+    var field = $('#linkField');
+    if (!field) return;
+    field.hidden = false;
+    $('#linkbox').value = url;
+    $('#openLink').href = url;
+    $('#waLink').href = 'https://wa.me/?text=' + encodeURIComponent('A letter for you: ' + url);
+    $('#linkNote').textContent = note;
+  }
+
+  function copyToClipboard(url, d, quiet) {
+    var done = function () {
+      toast(quiet ? 'Short link copied' : 'Link copied. Send it to ' + (d.to || 'them'));
+      if (!quiet) rain(70);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, function () { manualCopy(url); });
+    } else {
+      manualCopy(url);
+    }
+  }
+  function manualCopy(url) {
+    var box = $('#linkbox');
+    if (box) {
+      box.focus(); box.select();
+      try {
+        if (document.execCommand('copy')) { toast('Link copied'); return; }
+      } catch (e) { /* falls through to the message below */ }
+    }
+    toast('Select the link above and copy it');
+  }
+
+  function brokenLink() {
+    document.getElementById('theme').hidden = true;
+    app.innerHTML =
+      '<div class="card-stage">' +
+        '<h1>This card did not arrive whole</h1>' +
+        '<p class="lede" style="text-align:center">The link was cut short somewhere between the sender and here. ' +
+        'Ask them to send it again, pasted as plain text.</p>' +
+        '<button class="btn sun" id="mine">Write your own card</button>' +
+      '</div>';
+    $('#mine').addEventListener('click', function () { location.href = location.pathname; });
+  }
+
+  /* ---------------- boot ---------------- */
+  /* The separators between fields are real tildes, and a tilde the writer
+     typed is carried as %7E. Decoding the whole address here would turn one
+     into the other and split the card in the wrong places, so every field is
+     left to decode itself. Some chat apps do hand back a fully encoded
+     address, and that one case is unwrapped first. */
+  function rawCard(v) {
+    var s = String(v || '');
+    if (s.slice(0, 2) === '1~') return s;
+    try {
+      var dec = decodeURIComponent(s);
+      if (dec.slice(0, 2) === '1~') return dec;
+    } catch (e) { /* leave it exactly as it came */ }
+    return s;
+  }
+  var m = location.search.match(/[?&]c=([^&]*)/);
+  var cp = location.search.match(/[?&]copy=([^&]*)/);
+  if (m) {
+    var incoming = decode(rawCard(m[1]));
+    if (incoming && incoming.to) {
+      var sp = location.search.match(/[?&]p=([^&]+)/);
+      if (sp) {
+        var raw = unb64url(decodeURIComponent(sp[1]));
+        if (/^[A-Za-z0-9+/=]+$/.test(raw)) incoming.shot = raw;
+      }
+      renderCard(incoming);
+    } else {
+      brokenLink();
+    }
+  } else if (cp) {
+    /* "Make one like this" keeps the look and nothing that was personal. */
+    var look = decode(rawCard(cp[1]));
+    if (look) {
+      draft.colour = look.colour || draft.colour;
+      draft.pattern = look.pattern || draft.pattern;
+      draft.pen = PENS[look.pen] ? look.pen : draft.pen;
+      draft.sheet = SHEETS[look.sheet] ? look.sheet : draft.sheet;
+      draft.style = STYLES[look.style] ? look.style : draft.style;
+    }
+    applyPen(draft);
+    renderMaker();
+    toast('Same look, blank letter. Make it yours.');
+  } else {
+    applyPen(draft);
+    renderMaker();
+  }
+})();
+</script>
+</body>
+</html>
